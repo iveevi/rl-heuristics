@@ -16,15 +16,22 @@ models = {
 }
 
 # Epsilon greedy policy
-def egreedy_policy(outputs, epsilon):
+def egreedy_policy(outputs, state, epsilon):
     if np.random.rand() < epsilon:
         return np.random.randint(outputs)
     else:
         return -1
 
+# Bad heurestic
+def badhr_policy(outputs, state, epsilon):
+    if np.random.rand() < epsilon:
+        return 1
+    else:
+        return -1
+
 # TODO: add customization of DDQN (if using it)
 # Contains all information with respect to an agent in a simulation
-class Agent:
+class DQNAgent:
         # Skeleton is the skeleton of the model
         def __init__(self, skeleton, policy, outputs, gamma):
                 # Using a DDQN (TODO: ?)
@@ -49,7 +56,7 @@ class Agent:
         
         # Policy
         def do_policy(self, state, epsilon):
-                sout = self.policy(self.nouts, epsilon)
+                sout = self.policy(self.nouts, state, epsilon)
 
                 # If the policy did not activate its secondary function
                 if sout == -1:
@@ -123,11 +130,11 @@ class Agent:
             self.optimizer.apply_gradients(zip(grads, self.main.trainable_variables))
             '''
 
-def run_experiment(env_name):
+def run_experiment(env_name, policy):
     env = gym.make(env_name)
     skeleton = models[env_name]
 
-    agent = Agent(skeleton, egreedy_policy, env.action_space.n, 0.95)
+    agent = DQNAgent(skeleton, policy, env.action_space.n, 0.95)
 
     rewards = []
     epsilon = 1
@@ -160,6 +167,5 @@ def run_experiment(env_name):
 
 for pair in models:
     print("pair =", pair)
-    run_experiment(pair)
-
-egreedy_policy(6, 0.1)
+    run_experiment(pair, badhr_policy)
+    run_experiment(pair, egreedy_policy)
