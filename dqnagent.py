@@ -8,6 +8,7 @@ from collections import deque
 # Contains all information with respect to an agent in a simulation
 class DQNAgent:
         # Skeleton is the skeleton of the model
+        # TODO: take a sample size input
         def __init__(self, skeleton, policy, outputs, gamma):
                 # Using a DDQN (TODO: ?)
                 self.target = keras.models.clone_model(skeleton)
@@ -27,11 +28,11 @@ class DQNAgent:
                 self.episode = 0
                 self.gamma = gamma
                 self.loss = keras.losses.mean_squared_error # keras.losses.Huber()
-                self.optimizer = keras.optimizers.Adam(lr = 1e-2) # 6e-3)
+                self.optimizer = keras.optimizers.Adam(learning_rate = 1e-2) # 6e-3)
         
         # Policy
-        def do_policy(self, state):
-                sout = self.policy(self.nouts, state)
+        def do_policy(self, state, epsilon):
+                sout = self.policy(state, epsilon)
 
                 # If the policy did not activate its secondary function
                 if sout == -1:
@@ -42,15 +43,15 @@ class DQNAgent:
                 return sout
         
         # Playing a step
-        def step(self, env, state):
+        def step(self, env, state, epsilon):
             # Transfer main weights to target weights every now and then
             # if epsilon % 50 == 0:
             #    self.target.set_weights(self.main.get_weights())
 
-            action = self.do_policy(state)
+            action = self.do_policy(state, epsilon)
             nstate, reward, done, info = env.step(action)
             self.rbf.append((state, action, reward, nstate, done))
-            return nstate, reward, done, env
+            return nstate, reward, done
         
         # Sampling experiences
         def sample(self, size):

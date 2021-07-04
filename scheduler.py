@@ -7,6 +7,8 @@ class Scheduler:
     def __call__(self):
         self.iteration += 1
         return self.function(self.iteration)
+    def __copy__(self):
+        return type(self)(self.name, self.function)
     def reset(self):
         self.iteration = 0
 
@@ -16,8 +18,12 @@ class DelayedScheduler(Scheduler):
     '''
     def __init__(self, name, lag, function):
         ftn = lambda e : 1 if e < lag else function(e)
-
         super().__init__(name, ftn)
+
+        # Additional params
+        self.lag = lag
+    def __copy__(self):
+        return type(self)(self.name, self.lag, self.function)
 
 class LinearDecay(DelayedScheduler):
     '''
@@ -25,14 +31,12 @@ class LinearDecay(DelayedScheduler):
     @param lag the number of episodes to wait before starting the decay
     @param min the smallest value of the decay (flat line value)
     '''
-    def __init__(self, episodes, lag = 50, min = 0.1):
-        # ftn = lambda e : 1 if e < lag else max(1 - (1 - min) * (e - lag)/episodes, min)
+    def __init__(self, episodes, lag = 0, min = 0.1):
         ftn = lambda e : max(1 - (1 - min) * (e - lag)/episodes, min)
-
         super().__init__('Linear Decay', lag, ftn)
 
-linear1 = Scheduler('linear', lambda x : max(1 - x/60, 0.1))
-linear2 = LinearDecay(50, 10)
-
-for i in range(100):
-    print(f"#{i + 1: >4}: linear1 = {linear1(): .2f} linear2 = {linear2(): .2f}")
+        # Additonal params
+        self.episodes = episodes
+        self.min = min
+    def __copy__(self):
+        return type(self)(self.episodes, self.lag, self.min)
