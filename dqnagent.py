@@ -8,7 +8,6 @@ from collections import deque
 # Contains all information with respect to an agent in a simulation
 class DQNAgent:
         # Skeleton is the skeleton of the model
-        # TODO: take a sample size input
         def __init__(self, skeleton, policy, outputs, gamma):
                 # Using a DDQN (TODO: ?)
                 self.target = keras.models.clone_model(skeleton)
