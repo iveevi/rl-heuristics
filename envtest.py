@@ -112,6 +112,17 @@ class EnvTest:
         start = time.time()
 
         # Run the simulations
+        # TODO: run each simulations episodes in parallel separately
+        # Instead of waiting (better for multiple trials of the simulation)
+        # Only problem is writing results
+        #
+        # New format:
+        #
+        # Ename directory
+        # - policy names (file)
+        #
+        # Episode Trial #1, Trial #2, ..., Average
+        # .         .       .           .
         for eps in range(self.episodes):
 
             ''' Reset the observations

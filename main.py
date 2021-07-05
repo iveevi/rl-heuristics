@@ -3,6 +3,7 @@ import numpy as np
 from envtest import EnvTest
 from policy import Heurestic
 from scheduler import *
+from upload import setup, upload
 
 # Epsilon greedy policy
 def egreedy(state):
@@ -37,4 +38,6 @@ etest = EnvTest(
         32
 )
 
-etest.run()
+# etest.run()
+setup([etest])
+upload()
