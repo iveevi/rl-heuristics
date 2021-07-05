@@ -2,7 +2,6 @@ import numpy as np
 
 from envtest import EnvTest
 from policy import Heurestic
-from models import models
 from scheduler import *
 
 # Epsilon greedy policy
@@ -30,6 +29,7 @@ etest = EnvTest(
         ],
         [
             LinearDecay(400),
+            DampedOscillator(400),
             Scheduler('Zero', lambda e: 0)
         ],
         600,

@@ -80,8 +80,7 @@ class EnvTest:
         left = (average * (self.episodes - episode + 1))/60
 
         diff = left - self.left
-        out = (GREEN + f'+{diff:.3f}' + RESET)
-            if diff > 0 else (RED + f'{diff:.3f}' + RESET)
+        out = (GREEN + f'+{diff:.3f}' + RESET) if diff > 0 else (RED + f'{diff:.3f}' + RESET)
 
         # TODO: use mutex here to clean output
         print(f'{self.ename} completed episode #{episode}'
