@@ -7,23 +7,30 @@ from models import models
 from policy import Policy
 from scheduler import *
 
-class MatEntry:
+class Simulation:
     '''
     @param ename the name of environment in the gym registry
-    @param size the batch sizes
+    @param trial the trial number
+    @param batch_size the batch sizes
     '''
-    def __init__(self, ename, heurestic, scheduler, size, gamma):
-        # TODO: organize these attributes
+    def __init__(self, ename, trial, heurestic, scheduler, batch_size, gamma):
+        # Assigned attributes
+        self.ename = ename
+        self.trial = trial
+        self.batch_size = batch_size
+
+        # TODO: this is useless
+        self.pname = '(' + heurestic.name + ' & ' + scheduler.name + ')'
+
         self.obs = None
         self.score = 0
         self.episode = 0
         self.epsilon = 1
-        self.size = size
-        self.total_rewards = []
+
+        self.rewards = []
+        
         self.done = False
         self.env = gym.make(ename)
-        self.ename = ename
-        self.pname = '(' + heurestic.name + ' & ' + scheduler.name + ')'
         self.scheduler = copy(scheduler)
         self.agent = DQNAgent(
                 models[ename],
@@ -32,21 +39,18 @@ class MatEntry:
                 gamma
         )
 
-        # self.env.render()
-
     def reset(self):
         self.obs = self.env.reset()
 
-        # TODO: dont need this here
-        self.total_rewards.append((self.score, self.epsilon))
+        self.rewards.append((self.score, self.epsilon))
         self.score = 0
         self.done = False
         self.episode += 1
         self.epsilon = self.scheduler()
 
         # Train the model if enough elements
-        if len(self.agent.rbf) >= self.size:
-            self.agent.train(self.size)
+        if len(self.agent.rbf) >= self.batch_size:
+            self.agent.train(self.batch_size)
 
     def run(self):
         # Do nothing if already done
@@ -58,10 +62,11 @@ class MatEntry:
 
         return self.done
 
-    def run_episode(self, steps):
-        self.reset()
-        for step in range(steps):
-            done = self.run()
+    def run_trial(self, episodes, steps):
+        for episode in range(episodes):
+            self.reset()
+            for step in range(steps):
+                done = self.run()
 
-            if done:
-                break
+                if done:
+                    break
