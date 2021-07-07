@@ -1,7 +1,9 @@
+from copy import copy
 from threading import Thread
 
 from simulation import Simulation
 from upload import directory
+from colors import *
 
 # TODO: try to run many trials without incurring tensorflow warning (try to optimize a pure policy run)
 class PolicySimulation():
@@ -10,14 +12,19 @@ class PolicySimulation():
     '''
     def __init__(self, ename, heurestic, scheduler, trials, batch_size, gamma):
         # Transfering attributes
-        self.policy = heurestic.name + ' ' + scheduler.name
-        self.file = directory + '/' + '\'' + ename + '\'/\'' + self.policy + '\''
+        self.ename = ename
+        self.pname = heurestic.name + ' and ' + scheduler.name
+
+        self.scheduler = copy(scheduler)
+        self.file = directory + '/' + ename.replace(' ', '_')   \
+            + '/' + self.pname.replace(' ', '_') + '.csv'
 
         self.batch_size = batch_size
 
         # Load the simulations into a vector for processing
         self.sims = [
-            Simulation(ename, i + 1, heurestic, scheduler, batch_size, gamma)
+            Simulation(ename, self.pname, i + 1,
+                heurestic, scheduler, batch_size, gamma)
                 for i in range(trials)
         ]
     
@@ -27,7 +34,12 @@ class PolicySimulation():
 
         # Write the first line
         data_file.write(
-            (['Episodes'] + [i for i in range(1, episodes + 1)]).join(',')
+            ','.join(['Episodes'] + [str(i) for i in range(1, episodes + 1)])
+                + '\n'
+        )
+        data_file.write(
+            ','.join(['Epsilons','1'] + [str(self.scheduler()) for i in range(1, episodes)])
+                + '\n'
         )
         data_file.flush()
 
@@ -40,31 +52,41 @@ class PolicySimulation():
             ))
         
         # Launch the pool
-        done = [False for i in range(self.sims)]
         for thread in pool:
             thread.start()
         
         # Collect threads and write their results
-        while len(pool) > 0:
-            for i in range(len(self.sims)):
+        done = [False for i in range(len(pool))]
+        while True:
+            if all(d == True for d in done):
+                break
+
+            for i in range(len(done)):
                 if (not done[i]) and (not pool[i].is_alive()):
                     pool[i].join()
                     done[i] = True
 
                     # TODO: write/save the results
+                    print(YELLOW + f'{self.ename} : {self.pname} : Trial #{i + 1} finished.' + RESET)
+
                     data_file.write(
-                        ([f'Trial #{i + 1}'] + self.sims[i].rewards).join(',')
+                        ','.join(map(str, [f'Trial #{i + 1}']
+                            + self.sims[i].rewards)) + '\n'
                     )
                     data_file.flush()
-
-                    # Rerun the loop
-                    del pool[i]
-                    break
         
         # Run the final bench (no training)
+        data_file.write(
+            ','.join(['Bench Episodes'] + [str(i) for i in range(1, benchs + 1)])
+                + '\n'
+        )
+        
         for i in range(len(self.sims)):
             self.sims[i].run_bench(benchs, steps)
 
             data_file.write(
-                ([f'Final #{i + 1}'] + self.sims[i].finals).join(',')
+                ','.join(map(str, [f'Final #{i + 1}']
+                    + self.sims[i].finals)) + '\n'
             )
+
+        print(YELLOW + f'Finished {self.ename} : {self.pname} in [time].' + RESET)

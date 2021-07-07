@@ -28,19 +28,22 @@ class DQNAgent:
                 self.gamma = gamma
                 self.loss = keras.losses.mean_squared_error # keras.losses.Huber()
                 self.optimizer = keras.optimizers.Adam(learning_rate = 1e-2) # 6e-3)
-        
+
         # Policy
+        def set_policy(self, policy):
+            self.policy = policy
+
         def do_policy(self, state, epsilon):
                 sout = self.policy(state, epsilon)
 
                 # If the policy did not activate its secondary function
                 if sout == -1:
-                        Q_values = self.main.predict(state[np.newaxis])
+                        Q_values = self.main(state[np.newaxis])
                         return np.argmax(Q_values[0])
-                
+
                 # Value of secondary function
                 return sout
-        
+
         # Playing a step
         def step(self, env, state, epsilon):
             # Transfer main weights to target weights every now and then
@@ -51,12 +54,12 @@ class DQNAgent:
             nstate, reward, done, info = env.step(action)
             self.rbf.append((state, action, reward, nstate, done))
             return nstate, reward, done
-        
+
         # Sampling experiences
         def sample(self, size):
                 indices = np.random.randint(len(self.rbf), size = size)
                 batch = [self.rbf[index] for index in indices]
-                
+
                 states, actions, rewards, nstates, dones = [
                         np.array(
                                 [experience[field_index] for experience in batch]
@@ -64,14 +67,14 @@ class DQNAgent:
                 for field_index in range(5)]
 
                 return states, actions, rewards, nstates, dones
-        
+
         # Training for each step
         def train(self, size):
             states, actions, rewards, nstates, dones = self.sample(size)
 
-            next_Qvs = self.main.predict(nstates)
+            next_Qvs = self.main(nstates)
             max_next_Qvs = np.max(next_Qvs, axis = 1)
-            
+
             tgt_Qvs = (rewards + (1 - dones) * self.gamma * max_next_Qvs)
             tgt_Qvs = tgt_Qvs.reshape(-1, 1)
 
@@ -91,7 +94,7 @@ class DQNAgent:
             best_nactions = np.argmax(next_Qvs, axis=1)
             next_mask = tf.one_hot(best_nactions, self.nouts).numpy()
             next_best_Qvs = (self.target.predict(nstates) * next_mask).sum(axis = 1)
-            
+
             target_Qvs = (rewards + (1 - dones) * self.gamma * next_best_Qvs)
             target_Qvs = target_Qvs.reshape(-1, 1)
 

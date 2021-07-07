@@ -1,6 +1,6 @@
 import numpy as np
 
-from envtest import EnvTest
+from environment_simulation import EnvironmentSimulation
 from policy import Heurestic
 from scheduler import *
 from upload import setup, upload
@@ -21,7 +21,23 @@ def theta_omega(state):
     else:
         return 0 if theta < 0 else 1
 
-etest = EnvTest(
+# Use for testing only
+etest = EnvironmentSimulation(
+        'CartPole-v1',
+        [
+            Heurestic('Great HR', theta_omega)
+        ],
+        [
+            LinearDecay(400, 50),
+            DampedOscillator(400, 50)
+        ],
+        1,
+        100,
+        500,
+        32  # TODO: add bench episodes as a parameter
+)
+
+'''etest = EnvironmentSimulation(
         'CartPole-v1',
         [
             Heurestic('Epsilon Greedy', egreedy),
@@ -30,14 +46,16 @@ etest = EnvTest(
         ],
         [
             LinearDecay(400),
-            DampedOscillator(400),
-            Scheduler('Zero', lambda e: 0)
+            DampedOscillator(400)
         ],
-        600,
-        500,
-        32
-)
+        2,
+        2,
+        50,
+        32  # TODO: add bench episodes as a parameter
+)'''
 
-# etest.run()
 setup([etest])
+etest.run()
+
+# Prompt for upload
 upload()

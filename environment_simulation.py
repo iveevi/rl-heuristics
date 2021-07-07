@@ -3,8 +3,9 @@ import numpy as np
 
 from threading import Thread
 
-from scheduler import *
 from policy_simulation import PolicySimulation
+from scheduler import *
+from colors import *
 
 class EnvironmentSimulation:
     # For average window
@@ -23,7 +24,7 @@ class EnvironmentSimulation:
         nhrs = len(heurestics)
         schs = len(schedulers)
 
-        for i, j in np.ndindex([nhrs, schs]):
+        for i, j in np.ndindex(nhrs, schs):
             self.policies.append(PolicySimulation(ename, heurestics[i],
                 schedulers[j], trials, size, gamma))
 
@@ -32,7 +33,7 @@ class EnvironmentSimulation:
         for policy in self.policies:
             pool.append(Thread(
                 target = policy.run,
-                args = (self.episodes, self.steps, )
+                args = (self.episodes, 50, self.steps, )
             ))
         
         # Launch the threads
@@ -40,11 +41,15 @@ class EnvironmentSimulation:
             thread.start()
         
         # Collect all the threads
-        while len(pool) > 0:
-            for i in range(len(pool)):
-                if not pool[i].is_alive():
+        done = [False for i in range(len(pool))]
+        while True:
+            if all(d == True for d in done):
+                break
+            
+            for i in range(len(done)):
+                if (not done[i]) and (not pool[i].is_alive()):
                     pool[i].join()
-
-                    del pool[i]
+                    done[i] = True
 
         # Display the total time to complete
+        print(YELLOW + f'{self.ename} finished in [time]' + RESET)

@@ -6,6 +6,7 @@ from dqnagent import DQNAgent
 from models import models
 from policy import Policy
 from scheduler import *
+from colors import *
 
 class Simulation:
     '''
@@ -13,14 +14,12 @@ class Simulation:
     @param trial the trial number
     @param batch_size the batch sizes
     '''
-    def __init__(self, ename, trial, heurestic, scheduler, batch_size, gamma):
+    def __init__(self, ename, pname, trial, heurestic, scheduler, batch_size, gamma):
         # Assigned attributes
         self.ename = ename
+        self.pname = pname
         self.trial = trial
         self.batch_size = batch_size
-
-        # TODO: this is useless
-        self.pname = '(' + heurestic.name + ' & ' + scheduler.name + ')'
 
         self.obs = None
         self.score = 0
@@ -30,7 +29,7 @@ class Simulation:
         # Reward arrays
         self.rewards = []
         self.finals = []
-        
+
         self.done = False
         self.env = gym.make(ename)
         self.scheduler = copy(scheduler)
@@ -44,7 +43,7 @@ class Simulation:
     def reset(self):
         self.obs = self.env.reset()
 
-        self.rewards.append((self.score, self.epsilon))
+        self.rewards.append(self.score)
         self.score = 0
         self.done = False
         self.episode += 1
@@ -72,9 +71,13 @@ class Simulation:
 
                 if done:
                     break
-    
+
+            print(YELLOW + f'{self.ename} : {self.pname} : Trial #{self.trial}'
+                f' just finished episode #{episode + 1}' + RESET)
+
     # Running without any training, to see final results
     def run_bench(self, episodes, steps):
+        self.agent.set_policy(lambda x, y : -1)
         for episode in range(episodes):
             self.score = 0
 
@@ -83,5 +86,5 @@ class Simulation:
 
                 if done:
                     break
-            
+
             self.finals.append(self.score)
