@@ -46,7 +46,7 @@ class LinearDecay(DelayedScheduler):
         return type(self)(self.episodes, self.lag, self.min)
 
 class DampedOscillator(DelayedScheduler):
-    epsilon = 1e-5
+    epsilon = 1e-2
 
     '''
     @param m the minimum value of the scheduler
@@ -68,5 +68,3 @@ class DampedOscillator(DelayedScheduler):
         self.period = p
     def __copy__(self):
         return type(self)(self.episodes, self.lag, self.period, self.min)
-
-sch = DampedOscillator(100)

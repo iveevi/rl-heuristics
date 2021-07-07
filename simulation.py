@@ -27,7 +27,9 @@ class Simulation:
         self.episode = 0
         self.epsilon = 1
 
+        # Reward arrays
         self.rewards = []
+        self.finals = []
         
         self.done = False
         self.env = gym.make(ename)
@@ -70,3 +72,16 @@ class Simulation:
 
                 if done:
                     break
+    
+    # Running without any training, to see final results
+    def run_bench(self, episodes, steps):
+        for episode in range(episodes):
+            self.score = 0
+
+            for step in range(steps):
+                done = self.run()
+
+                if done:
+                    break
+            
+            self.finals.append(self.score)
