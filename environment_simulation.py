@@ -8,9 +8,6 @@ from scheduler import *
 from colors import *
 
 class EnvironmentSimulation:
-    # For average window
-    max_time_length = 25
-
     def __init__(self, ename, heurestics, schedulers, trials, episodes, steps, size, gamma = 0.95):
         self.ename = ename
 

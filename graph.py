@@ -1,37 +1,62 @@
 import matplotlib.pyplot as plt
 
-csv_file = open('CartPole-v1_results.csv')
+def graph_single(path):
+    # Create the subplot (and change the theme)
+    plt.style.use('ggplot')
 
-header = csv_file.readline()
-values = dict()
+    fig = plt.figure(figsize = (8, 6))
 
-fields = header[:-1].split(',')
-for field in fields[1:]:
-    values[field] = []
+    scores = fig.add_subplot(2, 2, 1)
+    eps = fig.add_subplot(2, 2, 3)
+    finals = fig.add_subplot(1, 2, 2)
 
-lines = csv_file.readlines()
+    spi = 0
+    for i in range(len(path)):
+        if path[i] == '/':
+            spi = i
 
-episodes = [i for i in range(1, len(lines) + 1)]
+    title = path[spi + 1:-4].replace('_', ' ')
+    fig.suptitle(f'Statistics for {title}')
 
-for line in lines:
-    vs = (line[:-1].split(','))[1:]
+    # Read the file
+    file = open(path)
+    lines = [line[:-1] for line in file.readlines()]
 
-    # print(vs)
-    for i in range(len(vs)):
-        values[fields[i + 1]].append(float(vs[i]))
+    final = 0
+    while lines[final][0] != 'F': final += 1
 
-fig, (scores, epsilons) = plt.subplots(2)
-fig.suptitle('CartPole-v1 Results')
+    # Collect episodes
+    episodes = lines[0].split(',')
+    epsilons = lines[1].split(',')
+    episodes = [float(s) for s in episodes[1:]]
 
-# Plotting results
-for i in range(1, len(values) + 1, 2): # Scores
-    stripped = (fields[i])[1:-7]
-    scores.plot(episodes, values[fields[i]], label = stripped)
+    for line in lines[2 : final - 1]:
+        split = line.split(',')
 
-for i in range(2, len(values) + 1, 2): # Epsilons
-    stripped = (fields[i])[1:-9]
-    epsilons.plot(episodes, values[fields[i]], label = stripped)
+        label = split[0]
+        values = split[1:]
 
-scores.legend(loc = 'upper left')
-epsilons.legend(loc = 'upper left')
-plt.show()
+        scores.plot(episodes, [float(s) for s in values], label = label)
+    
+    feps = lines[final - 1].split(',')
+    feps = [float(s) for s in feps[1:]]
+    for line in lines[final:]:
+        split = line.split(',')
+
+        label = split[0]
+        values = split[1:]
+
+        finals.plot(feps, [float(s) for s in values], label = label) 
+    
+    eps.plot(episodes, [float(s) for s in epsilons[1:]], label = 'Epsilon')
+
+    finals.set_ylabel('Bench Scores')
+    scores.set_ylabel('Scores')
+    eps.set_ylabel('Epsilon')
+    eps.set_xlabel('Episodes')
+    finals.set_xlabel('Episodes')
+    
+    fig.tight_layout()
+    plt.show()
+
+graph_single('results_2021-07-07_13:32:09.393927/CartPole-v1/Great_HR_and_Damped_Oscillator.csv')
