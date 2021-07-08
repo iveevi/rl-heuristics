@@ -65,7 +65,6 @@ class Simulation:
 
     def run_trial(self, episodes, steps):
         for episode in range(episodes):
-            self.reset()
             for step in range(steps):
                 done = self.run()
 
@@ -74,6 +73,9 @@ class Simulation:
 
             print(YELLOW + f'{self.ename} : {self.pname} : Trial #{self.trial}'
                 f' just finished episode #{episode + 1}' + RESET)
+            
+            # Reset after loop
+            self.reset()
 
     # Running without any training, to see final results
     def run_bench(self, episodes, steps):
