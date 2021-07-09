@@ -1,5 +1,5 @@
 from copy import copy
-from threading import Thread
+from multiprocessing import Process
 
 from simulation import Simulation
 from upload import directory
@@ -46,16 +46,16 @@ class PolicySimulation():
         # Construct the pool
         pool = []
         for sim in self.sims:
-            pool.append(Thread(
+            pool.append(Process(
                 target = sim.run_trial,
                 args = (episodes, steps, )
             ))
         
         # Launch the pool
-        for thread in pool:
-            thread.start()
+        for process in pool:
+            process.start()
         
-        # Collect threads and write their results
+        # Collect processes and write their results
         done = [False for i in range(len(pool))]
         while True:
             if all(d == True for d in done):

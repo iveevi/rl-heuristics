@@ -1,7 +1,7 @@
 import csv
 import numpy as np
 
-from threading import Thread
+from multiprocessing import Process
 
 from policy_simulation import PolicySimulation
 from scheduler import *
@@ -28,16 +28,16 @@ class EnvironmentSimulation:
     def run(self):
         pool = []
         for policy in self.policies:
-            pool.append(Thread(
+            pool.append(Process(
                 target = policy.run,
                 args = (self.episodes, 50, self.steps, )
             ))
         
-        # Launch the threads
-        for thread in pool:
-            thread.start()
+        # Launch the processes
+        for process in pool:
+            process.start()
         
-        # Collect all the threads
+        # Collect all the processes
         done = [False for i in range(len(pool))]
         while True:
             if all(d == True for d in done):
