@@ -11,9 +11,13 @@ def setup(envtests):
     for envtest in envtests:
         os.system(f'mkdir -p {directory}/{envtest.ename}')
 
-def upload(auto = False):
+def upload(auto = False, sudo = None):
     if auto:
         os.system(f'gdrive upload -r {directory}')
+    elif not sudo == None:
+        print('Skipping upload.')
+
+        return
     
     while True:
         str = input('Upload to drive? [y/n] ')

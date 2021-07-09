@@ -1,35 +1,24 @@
-import numpy as np
+import os
+import errno
+import fcntl
+import socket
+
+from multiprocessing import Process
 
 from environment_simulation import EnvironmentSimulation
 from policy import Heurestic
-from scheduler import *
 from upload import setup, upload
+from scheduler import *
+from heurestics import *
 
-# Epsilon greedy policy
-def egreedy(state):
-    return np.random.randint(1)
-
-# Bad heurestic
-def badhr(state):
-    return 1
-
-# Best heurestic
-def theta_omega(state):
-    theta, w = state[2:4]
-    if abs(theta) < 0.03:
-        return 0 if w < 0 else 1
-    else:
-        return 0 if theta < 0 else 1
-
-# Use for testing only
+# Define tests here (and later in another file)
 etest = EnvironmentSimulation(
         'CartPole-v1',
         [
             Heurestic('Great HR', theta_omega)
         ],
         [
-            LinearDecay(400, 50),
-            DampedOscillator(400, 50)
+            LinearDecay(400, 50)
         ],
         1,
         100,
@@ -37,25 +26,27 @@ etest = EnvironmentSimulation(
         32  # TODO: add bench episodes as a parameter
 )
 
-'''etest = EnvironmentSimulation(
-        'CartPole-v1',
-        [
-            Heurestic('Epsilon Greedy', egreedy),
-            Heurestic('Bad HR', badhr),
-            Heurestic('Great HR', theta_omega)
-        ],
-        [
-            LinearDecay(400),
-            DampedOscillator(400)
-        ],
-        2,
-        2,
-        50,
-        32  # TODO: add bench episodes as a parameter
-)'''
+# Simulation routine
+def do_sims():
 
-setup([etest])
-etest.run()
+    setup([etest])
+    etest.run()
 
-# Prompt for upload
-upload()
+    # Prompt for upload
+    upload(sudo = True)
+
+# Main routine
+if __name__ == '__main__':
+    if os.path.isfile('cache.txt'):
+        cache = open('cache.txt', 'r')
+        token = cache.readline()
+    else:
+        token = input('Enter bot token: ')
+        cache = open('cache.txt', 'w')
+        cache.write(token)
+
+    # TODO: put in another function
+    os.system(f'python3 bot.py {token} &')
+
+    # process = Process(target = do_sims, args = ())
+    # process.start()
