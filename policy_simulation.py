@@ -4,6 +4,7 @@ from threading import Thread
 from simulation import Simulation
 from upload import directory
 from colors import *
+from notify import *
 
 # TODO: try to run many trials without incurring tensorflow warning (try to optimize a pure policy run)
 class PolicySimulation():
@@ -66,9 +67,6 @@ class PolicySimulation():
                     pool[i].join()
                     done[i] = True
 
-                    # TODO: write/save the results
-                    print(YELLOW + f'{self.ename} : {self.pname} : Trial #{i + 1} finished.' + RESET)
-
                     data_file.write(
                         ','.join(map(str, [f'Trial #{i + 1}']
                             + self.sims[i].rewards)) + '\n'
@@ -89,4 +87,7 @@ class PolicySimulation():
                     + self.sims[i].finals)) + '\n'
             )
 
-        print(YELLOW + f'Finished {self.ename} : {self.pname} in [time].' + RESET)
+        # Notify
+        msg = f'Finished {self.ename} : {self.pname} in [time].'
+        print(msg)
+        notify(msg)

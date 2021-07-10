@@ -1,6 +1,36 @@
 import time
 import numpy as np
 
+from colors import *
+
+def fmt_time(t):
+    hours = t // (60 * 60)
+    t %= 60 * 60
+
+    minutes = t // 60
+    t %= 60
+
+    out = ''
+
+    if hours > 0:
+        out += f'{hours:.2f}h '
+
+    if minutes > 0:
+        out += f'{minutes:.2f}m '
+        
+    return out + f'{t:.2f}s'
+
+def cmp_and_fmt(old, new):
+    out1 = ''
+    out2 = ''
+    if new > old:
+        out1 = GREEN + '+'
+        out2 = '+'
+    else:
+        out1 = RED + '-'
+        out2 = '-'
+    return new, (out1 + fmt_time(new) + RESET), (out2 + fmt_time(new))
+
 class TimeBuffer:
     max_buffer_len = 25
 
@@ -15,29 +45,21 @@ class TimeBuffer:
     # Automatically progresses the iterations
     def split(self):
         end = time.time()
-        self.buffer.append(end - self.end)
+        t = end - self.end
+        self.buffer.append(t)
         self.end = end
         self.iterations -= 1
 
         if len(self.buffer) > self.max_buffer_len:
             del self.buffer[0]
+        
+        return t
     
-    def __str__(self):
+    def projected(self):
         average = np.sum(self.buffer)/len(self.buffer)
         average *= self.iterations
 
-        hours = average // (60 * 60)
-        average %= 60 * 60
-
-        minutes = average // 60
-        average %= 60
-
-        out = ''
-
-        if hours > 0:
-            out += f'{hours}h '
-
-        if minutes > 0:
-            out += f'{minutes}m '
-        
-        out += f'{average}s'
+        return average
+    
+    def __str__(self):
+        return fmt_time(self.projected())

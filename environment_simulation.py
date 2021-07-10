@@ -6,6 +6,7 @@ from threading import Thread
 from policy_simulation import PolicySimulation
 from scheduler import *
 from colors import *
+from notify import *
 
 class EnvironmentSimulation:
     # For average window
@@ -52,4 +53,6 @@ class EnvironmentSimulation:
                     done[i] = True
 
         # Display the total time to complete
-        print(YELLOW + f'{self.ename} finished in [time]' + RESET)
+        msg = f'{self.ename} finished in [time]'
+        print(msg)
+        notify(msg)

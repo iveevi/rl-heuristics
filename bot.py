@@ -18,7 +18,7 @@ async def on_ready():
         name = 'general'
     )
 
-    await channel.send('@everyone: ' + sys.argv[2])
+    await channel.send(sys.argv[2])
     await client.close()
 
 token = sys.argv[1]

@@ -5,8 +5,10 @@ from copy import copy
 from dqnagent import DQNAgent
 from models import models
 from policy import Policy
+from time_buffer import *
 from scheduler import *
 from colors import *
+from notify import *
 
 class Simulation:
     '''
@@ -64,16 +66,37 @@ class Simulation:
         return self.done
 
     def run_trial(self, episodes, steps):
+        # Setting up time
+        start = time.time()
+        tb = TimeBuffer(episodes)
+        proj = 0
+
         for episode in range(episodes):
             self.reset()
+            tb.start()
             for step in range(steps):
                 done = self.run()
 
                 if done:
                     break
+            
+            t = tb.split()
+            proj, fmt1, ftm2 = cmp_and_fmt(proj, tb.projected())
 
-            print(YELLOW + f'{self.ename} : {self.pname} : Trial #{self.trial}'
-                f' just finished episode #{episode + 1}' + RESET)
+            # Log
+            msg = f'{self.ename}, {self.pname}, #{self.trial}' \
+                f' ep #{episode + 1} [{fmt_time(t)}], proj '
+            print(msg + f'[{fmt1}]')
+
+            # Log only a couple episodes (set as variable)
+            if episode % interval == 0:
+                log(msg + f'[{ftm2}]')
+        
+        # Notify
+        t = time.time() - start
+        msg = f'{self.ename}, {self.pname}, #{self.trial} finished in {fmt_time(t)}'
+        print(msg)
+        notify(msg)
 
     # Running without any training, to see final results
     def run_bench(self, episodes, steps):
