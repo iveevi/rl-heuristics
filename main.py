@@ -1,10 +1,8 @@
 import os
-import errno
-import fcntl
-import socket
 
 from multiprocessing import Process
 
+'''
 from environment_simulation import EnvironmentSimulation
 from policy import Heurestic
 from upload import setup, upload
@@ -34,9 +32,9 @@ def do_sims():
 
     # Prompt for upload
     upload(sudo = True)
+'''
 
-# Main routine
-if __name__ == '__main__':
+def get_token():
     if os.path.isfile('cache.txt'):
         cache = open('cache.txt', 'r')
         token = cache.readline()
@@ -44,9 +42,13 @@ if __name__ == '__main__':
         token = input('Enter bot token: ')
         cache = open('cache.txt', 'w')
         cache.write(token)
+    return token
 
-    # TODO: put in another function
-    os.system(f'python3 bot.py {token} &')
+def notify(token, msg):
+    os.system(f'python3 bot.py {token} \'{msg}\' &')
 
-    # process = Process(target = do_sims, args = ())
-    # process.start()
+# Main routine
+if __name__ == '__main__':
+    token = get_token()
+
+    notify(token, 'Simulations have terminated :thumbsup:')
