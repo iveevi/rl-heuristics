@@ -1,9 +1,11 @@
 import csv
+import time
 import numpy as np
 
 from threading import Thread
 
 from policy_simulation import PolicySimulation
+from time_buffer import *
 from scheduler import *
 from colors import *
 from notify import *
@@ -30,6 +32,8 @@ class EnvironmentSimulation:
                 schedulers[j], trials, size, gamma))
 
     def run(self):
+        start = time.time()
+
         pool = []
         for policy in self.policies:
             pool.append(Thread(
@@ -53,6 +57,7 @@ class EnvironmentSimulation:
                     done[i] = True
 
         # Display the total time to complete
-        msg = f'{self.ename} finished in [time]'
+        t = time.time() - start
+        msg = f'{self.ename} finished in {fmt_time(t)}'
         print(msg)
         notify(msg)

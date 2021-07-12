@@ -1,9 +1,9 @@
 import os
+import notify
 
 from simlist import do_sims
-from notify import *
 
 # Main routine
 if __name__ == '__main__':
-    get_token()
+    notify.su_off = True
     do_sims()

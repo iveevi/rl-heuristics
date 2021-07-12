@@ -1,12 +1,22 @@
+import time
+
 from copy import copy
 from threading import Thread
+from pathos.multiprocessing import ProcessPool
 
+from time_buffer import *
 from simulation import Simulation
 from upload import directory
 from colors import *
 from notify import *
 
-# TODO: try to run many trials without incurring tensorflow warning (try to optimize a pure policy run)
+import tensorflow as tf
+
+from tensorflow import keras
+
+def run_trial(agent, env, policy, episodes, steps):
+    pass
+
 class PolicySimulation():
     '''
     @param trials the number of trials to conduct
@@ -30,38 +40,49 @@ class PolicySimulation():
         ]
     
     def run(self, episodes, benchs, steps):
+        start = time.time()
+
         # Open the file
-        data_file = open(self.file, 'w')
+        # data_file = open(self.file, 'w')
 
         # Write the first line
-        data_file.write(
-            ','.join(['Episodes'] + [str(i) for i in range(1, episodes + 1)])
-                + '\n'
-        )
-        data_file.write(
-            ','.join(['Epsilons','1'] + [str(self.scheduler()) for i in range(1, episodes)])
-                + '\n'
-        )
-        data_file.flush()
+        # data_file.write(
+        #     ','.join(['Episodes'] + [str(i) for i in range(1, episodes + 1)])
+        #         + '\n'
+        # )
+        # data_file.write(
+        #     ','.join(['Epsilons','1'] + [str(self.scheduler()) for i in range(1, episodes)])
+        #         + '\n'
+        # )
+        # data_file.flush()
 
         # Construct the pool
-        pool = []
-        for sim in self.sims:
-            pool.append(Thread(
-                target = sim.run_trial,
-                args = (episodes, steps, )
-            ))
+        self.main = keras.models.clone_model(skeleton)
+        self.main.set_weights(skeleton.get_weights())
+
+        eplist = [episodes for i in range(len(self.sims))]
+        stlist = [steps for i in range(len(self.sims))]
+
+        pool = ProcessPool(len(self.sims))
+        pool.map(Simulation.run_trial, self.sims, eplist, stlist)
+        # pool = []
+        # for sim in self.sims:
+        #     pool.append(Process(
+        #         target = sim.run_trial,
+        #         args = (episodes, steps, )
+        #     ))
         
-        # Launch the pool
-        for thread in pool:
-            thread.start()
+        # # Launch the pool
+        # for thread in pool:
+        #     thread.start()
         
         # Collect threads and write their results
-        done = [False for i in range(len(pool))]
-        while True:
-            if all(d == True for d in done):
-                break
-
+        # done = [False for i in range(len(pool))]
+        # while True:
+        #     if all(d == True for d in done):
+        #         break
+        
+        '''
             for i in range(len(done)):
                 if (not done[i]) and (not pool[i].is_alive()):
                     pool[i].join()
@@ -72,6 +93,7 @@ class PolicySimulation():
                             + self.sims[i].rewards)) + '\n'
                     )
                     data_file.flush()
+        '''
         
         # Run the final bench (no training)
         data_file.write(
@@ -88,6 +110,7 @@ class PolicySimulation():
             )
 
         # Notify
-        msg = f'Finished {self.ename} : {self.pname} in [time].'
+        t = time.time() - start
+        msg = f'Finished {self.ename} : {self.pname} in {fmt_time(t)}.'
         print(msg)
         notify(msg)

@@ -9,10 +9,3 @@ class Policy:
             return self.function(state)
 
         return -1
-
-class Heurestic:
-    def __init__(self, name, function):
-        self.name = name
-        self.function = function
-    def __call__(self, x):
-        return self.function(x)

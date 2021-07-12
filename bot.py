@@ -18,8 +18,15 @@ async def on_ready():
         name = 'general'
     )
 
-    await channel.send(sys.argv[2])
+    await channel.send(sys.argv[1])
     await client.close()
 
-token = sys.argv[1]
+
+if os.path.isfile('cache.txt'):
+    cache = open('cache.txt', 'r')
+    token = cache.readline()
+else:
+    token = input('Enter bot token: ')
+    cache = open('cache.txt', 'w')
+    cache.write(token)
 client.run(token)

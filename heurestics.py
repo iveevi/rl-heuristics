@@ -1,5 +1,12 @@
 import numpy as np
 
+class Heurestic:
+    def __init__(self, name, function):
+        self.name = name
+        self.function = function
+    def __call__(self, x):
+        return self.function(x)
+
 # Epsilon greedy policy
 def egreedy(state):
     return np.random.randint(1)

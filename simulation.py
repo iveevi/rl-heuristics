@@ -84,8 +84,8 @@ class Simulation:
             proj, fmt1, ftm2 = cmp_and_fmt(proj, tb.projected())
 
             # Log
-            msg = f'{self.ename}, {self.pname}, #{self.trial}' \
-                f' ep #{episode + 1} [{fmt_time(t)}], proj '
+            msg = f'{self.ename:<20} {self.pname:<40} #{self.trial:<5}' \
+                f' ep #{episode + 1:<5} [{fmt_time(t)}] proj '
             print(msg + f'[{fmt1}]')
 
             # Log only a couple episodes (set as variable)
@@ -94,7 +94,7 @@ class Simulation:
         
         # Notify
         t = time.time() - start
-        msg = f'{self.ename}, {self.pname}, #{self.trial} finished in {fmt_time(t)}'
+        msg = f'{self.ename:<20} {self.pname:<20} #{self.trial:<5} finished in {fmt_time(t)}'
         print(msg)
         notify(msg)
 
