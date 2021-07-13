@@ -85,6 +85,7 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
     # Training loop
     tb = TimeBuffer(episodes)
+    proj = 0
 
     for e in range(episodes):
         # Get the first observation
@@ -111,7 +112,9 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
         # Post episode routines
         tb.split()
-        print(f'Trial {trial}, Episode {e}, Score = {score}, Epsilon {eps}, Time = {tb}')
+        proj, fmt1, fmt2 = cmp_and_fmt(proj, tb.projected())
+        print(f'Trial {trial}, Episode {e}, Score = {score}, Epsilon {eps},' \
+                f' Time = [{tb}], Projected [{fmt1}]')
         scores.append(score)
         epsilons.append(eps)
         eps = scheduler()
@@ -134,7 +137,7 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    
+
     # Training loop
     finals = []
     for e in range(bench_episodes):
@@ -155,13 +158,11 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
             if done:
                 break
 
-        # Progress the scheduler
-        print(f'Trial {trial}, Final Episode {e}, Score = {score}, Epsilon {eps}')
         finals.append(score)
 
     return scores, epsilons, finals
 
-def write_data(fpath, rets):
+def write_data(fpath, rets, episodes):
     fout = open(fpath, 'w')
 
     fout.write(', '.join(['Episodes'] + [str(i) for i in range(1, episodes + 1)]) + '\n')
@@ -171,7 +172,7 @@ def write_data(fpath, rets):
     for scores, epsilon, finals in rets:
         fout.write(', '.join([f'Trial #{i}'] + [str(s) for s in scores]) + '\n')
         i += 1
-    
+
     fout.write(', '.join(['Bench Episodes'] + [str(i) for i in range(1, bench_episodes + 1)]) + '\n')
 
     i = 1
@@ -185,7 +186,7 @@ def run_policy(fpath, ename, skeleton, heurestic, scheduler, trials, episodes, s
         trials * [heurestic], trials * [scheduler],
         [i for i in range(1, trials + 1)], trials * [episodes],
         trials * [steps])
-    write_data(fpath, rets)
+    write_data(fpath, rets, episodes)
 
 # TODO: setup parallel process these policies
 dir = setup(environments)

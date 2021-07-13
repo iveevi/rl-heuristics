@@ -17,7 +17,7 @@ def fmt_time(t):
 
     if minutes > 0:
         out += f'{minutes:.2f}m '
-        
+
     return out + f'{t:.2f}s'
 
 def cmp_and_fmt(old, new):
@@ -38,10 +38,10 @@ class TimeBuffer:
         self.end = time.time()
         self.buffer = []
         self.iterations = iterations
-    
+
     def start(self):
         self.end = time.time()
-    
+
     # Automatically progresses the iterations
     def split(self):
         end = time.time()
@@ -52,14 +52,14 @@ class TimeBuffer:
 
         if len(self.buffer) > self.max_buffer_len:
             del self.buffer[0]
-        
+
         return t
-    
+
     def projected(self):
         average = np.sum(self.buffer)/len(self.buffer)
         average *= self.iterations
 
         return average
-    
+
     def __str__(self):
         return fmt_time(self.projected())

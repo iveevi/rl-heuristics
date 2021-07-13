@@ -4,9 +4,6 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Configure plt
-plt.ion()
-
 def graph_file(path):
     # Create the subplot (and change the theme)
     plt.style.use('ggplot')
@@ -71,6 +68,15 @@ def graph_file(path):
 
     fig.tight_layout()
     plt.show()
+
+    save = input('Save? [y/n] ')
+    if save == 'y':
+        index = path.find('/')
+        pdfs = path[:index] + '/pdfs/'
+        os.system(f'mkdir -p {pdfs}')
+        loc = pdfs + path[spi + 1:-4] + '.pdf'
+        print(f'Saving to {loc}...\n')
+        fig.savefig(loc)
 
 def file_averages(path):
     # Read the file
@@ -144,6 +150,15 @@ def graph_full_environment(path, files):
 
     fig.tight_layout()
     plt.show()
+
+    save = input('Save? [y/n] ')
+    if save == 'y':
+        index = path.find('/')
+        pdfs = path[:index] + '/pdfs/'
+        os.system(f'mkdir -p {pdfs}')
+        loc = pdfs + path[spi + 1:] + '.pdf'
+        print(f'Saving to {loc}...\n')
+        fig.savefig(loc)
 
 def graph_environment(path):
     # List of directories
