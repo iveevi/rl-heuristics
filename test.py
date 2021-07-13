@@ -10,6 +10,7 @@ from pathos.multiprocessing import ProcessPool
 from scheduler import *
 from heurestics import *
 from upload import *
+from time_buffer import *
 
 # Global variables
 bench_episodes = 50
@@ -83,11 +84,14 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     epsilons = []
 
     # Training loop
+    tb = TimeBuffer(episodes)
+
     for e in range(episodes):
         # Get the first observation
         state = env.reset()
         score = 0
 
+        tb.start()
         for s in range(steps):
             # Get the action
             if np.random.rand() < eps:
@@ -105,8 +109,9 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
             if done:
                 break
 
-        # Progress the scheduler
-        print(f'Trial {trial}, Episode {e}, Score = {score}, Epsilon {eps}')
+        # Post episode routines
+        tb.split()
+        print(f'Trial {trial}, Episode {e}, Score = {score}, Epsilon {eps}, Time = {tb}')
         scores.append(score)
         epsilons.append(eps)
         eps = scheduler()
