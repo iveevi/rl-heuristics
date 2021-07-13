@@ -12,3 +12,5 @@ models = {
         keras.layers.Dense(2)
     ])
 }
+
+models['CartPole-v1'].summary()

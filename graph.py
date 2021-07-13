@@ -30,7 +30,7 @@ def graph_file(path):
     lines = [line[:-1] for line in file.readlines()]
 
     final = 0
-    while lines[final][0] != 'F': final += 1
+    while lines[final][0] != 'B': final += 1
 
     # Collect episodes
     episodes = lines[0].split(',')
@@ -45,9 +45,9 @@ def graph_file(path):
 
         scores.plot(episodes, [float(s) for s in values], label = label)
 
-    feps = lines[final - 1].split(',')
+    feps = lines[final].split(',')
     feps = [float(s) for s in feps[1:]]
-    for line in lines[final:]:
+    for line in lines[final + 1:]:
         split = line.split(',')
 
         label = split[0]
@@ -71,7 +71,6 @@ def graph_file(path):
 
     fig.tight_layout()
     plt.show()
-    plt.pause(0.001)
 
 def file_averages(path):
     # Read the file
@@ -79,14 +78,14 @@ def file_averages(path):
     lines = [line[:-1] for line in file.readlines()]
 
     final = 0
-    while lines[final][0] != 'F': final += 1
+    while lines[final][0] != 'B': final += 1
 
     trials = [
         [float(s) for s in (line.split(','))[1:]] for line in lines[2:final - 1]
     ]
 
     finals = [
-        [float(s) for s in (line.split(','))[1:]] for line in lines[final:]
+        [float(s) for s in (line.split(','))[1:]] for line in lines[final + 1:]
     ]
 
     trials_average = np.average(trials, axis = 0).tolist()
@@ -145,11 +144,8 @@ def graph_full_environment(path, files):
 
     fig.tight_layout()
     plt.show()
-    plt.pause(0.001)
 
 def graph_environment(path):
-    print('path = ', path)
-
     # List of directories
     files = [f for f in os.listdir(path) if f.endswith('.csv')]
 

@@ -2,18 +2,21 @@ import os
 
 from datetime import datetime
 
-directory = f'results {datetime.now()}'.replace(' ', '_')
-def setup(envtests):
+def setup(enames):
+    directory = f'results {datetime.now()}'.replace(' ', '_')
+
     os.system(f'mkdir -p {directory}')
     os.system('gdrive about')
 
     # Create a directory for each envtest
-    for envtest in envtests:
-        os.system(f'mkdir -p {directory}/{envtest.ename}')
+    for ename in enames:
+        os.system(f'mkdir -p {directory}/{ename}')
+    
+    return directory
 
-def upload(auto = False, sudo = None):
+def upload(dir, auto = False, sudo = None):
     if auto:
-        os.system(f'gdrive upload -r {directory}')
+        os.system(f'gdrive upload -r {dir}')
     elif not sudo == None:
         print('Skipping upload.')
 
@@ -27,4 +30,4 @@ def upload(auto = False, sudo = None):
         elif str == 'n':
             return
 
-    os.system(f'gdrive upload -r {directory}')
+    os.system(f'gdrive upload -r {dir}')
