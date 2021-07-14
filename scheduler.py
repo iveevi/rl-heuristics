@@ -59,9 +59,9 @@ class DampedOscillator(DelayedScheduler):
         osc = lambda e : math.exp(-alpha * e) * math.cos(2 * math.pi * (e + p/4)/p)
 
         ftn = lambda e : base(e) + osc(e)
-        
+
         super().__init__('Damped Oscillator', lag, ftn)
-        
+
         # Additonal params
         self.episodes = episodes
         self.min = m

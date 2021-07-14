@@ -36,7 +36,7 @@ def graph_file(path):
     epsilons = lines[1].split(',')
     episodes = [float(s) for s in episodes[1:]]
 
-    for line in lines[2 : final - 1]:
+    for line in lines[2 : final]:
         split = line.split(',')
 
         label = split[0]
@@ -100,6 +100,10 @@ def file_averages(path):
 
     trials_average = np.average(trials, axis = 0).tolist()
     finals_average = np.average(finals, axis = 0).tolist()
+
+    policy = path[path.rindex('/') + 1: -4]
+    print('\n' + policy + ', average training score:', np.average(trials_average))
+    print(policy + ', average bench score:', np.average(finals_average))
 
     return (trials_average, finals_average)
 
