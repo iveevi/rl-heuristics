@@ -3,10 +3,12 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
+sns.set_theme()
 def graph_file(path):
     # Create the subplot (and change the theme)
-    plt.style.use('ggplot')
+    # plt.style.use('ggplot')
 
     fig = plt.figure(figsize = (8, 6))
 
@@ -77,6 +79,8 @@ def graph_file(path):
         loc = pdfs + path[spi + 1:-4] + '.pdf'
         print(f'Saving to {loc}...\n')
         fig.savefig(loc)
+    else:
+        print()
 
 def file_averages(path):
     # Read the file
@@ -159,6 +163,8 @@ def graph_full_environment(path, files):
         loc = pdfs + path[spi + 1:] + '.pdf'
         print(f'Saving to {loc}...\n')
         fig.savefig(loc)
+    else:
+        print()
 
 def graph_environment(path):
     # List of directories
