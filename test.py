@@ -22,10 +22,10 @@ def sample(rbf, size):
 
     return states, actions, rewards, nstates, dones
 
-def train():
+def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     states, actions, rewards, nstates, dones = sample(rbf, batch_size)
 
-    next_Qvs = m1(nstates)
+    next_Qvs = model(nstates)
     max_next_Qvs = np.max(next_Qvs, axis = 1)
 
     tgt_Qvs = (rewards + (1 - dones) * gamma * max_next_Qvs)
@@ -33,12 +33,12 @@ def train():
 
     mask = tf.one_hot(actions, nouts)
     with tf.GradientTape() as tape:
-        all_Qvs = m1(states)
+        all_Qvs = model(states)
         Qvs = tf.reduce_sum(all_Qvs * mask, axis = 1, keepdims = True)
         loss = tf.reduce_mean(loss_ftn(tgt_Qvs, Qvs))
 
-    grads = tape.gradient(loss, m1.trainable_variables)
-    optimizer.apply_gradients(zip(grads, m1.trainable_variables))
+    grads = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
 # If a skeleton becomes necessary use a list of some named tuples, or smthing
 def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
@@ -46,7 +46,7 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
     from tensorflow import keras
 
-    # Config GPUs
+    # Config GPUs (consume only half the memory)
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
         for gpu in gpus:
@@ -67,10 +67,15 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     m2 = keras.models.Sequential(layers)
 
     # Other variables
-    env = gym.make(ename)
+    env1 = gym.make(ename)
+    env2 = gym.make(ename)
+    
     eps = 1
     keps = (1 - eps)/2
-    rbf = deque(maxlen = 2000)  # Should be customizable
+
+    rbf1 = deque(maxlen = 2000)  # Should be customizable
+    rbf2 = deque(maxlen = 2000)  # Should be customizable
+
     batch_size = 32             # Should be customizable
     scheduler = copy(schedref)
 
@@ -92,29 +97,30 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
     for e in range(episodes):
         # Get the first observation
-        state = env.reset()
-        score = 0
+        state1 = env1.reset()
+        state2 = env1.reset()
+
+        score1 = 0
+        score2 = 0
 
         tb.start()
+
         for s in range(steps):
             # Get the action
-
-            # TODO: two possible policies:
-            # - teacher student: only the student gets towed
-            # - peer peer: both exchange "ideas"
             if np.random.rand() < eps:
-                action = heurestic(state)
+                action1 = heurestic(state)
+                # action2 = heurestic(state)
             else:
-                Qvs = m1(state[np.newaxis])
-                action = np.argmax(Qvs[0])
+                Qvs = m1(state1[np.newaxis])
+                action1 = np.argmax(Qvs[0])
 
             # Apply the action and update the state
-            nstate, reward, done, info = env.step(action)
-            rbf.append((state, action, reward, nstate, done))
+            nstate, reward, done1, info = env.step(action1)
+            rbf1.append((state, action, reward, nstate, done1))
             state = nstate
             score += reward
 
-            if done:
+            if done1:
                 break
 
         # Post episode routines
@@ -136,23 +142,8 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
         keps = (1 - eps)/2
 
         # Train the model if the rbf is full enough
-        if len(rbf) >= batch_size:
-            states, actions, rewards, nstates, dones = sample(rbf, batch_size)
-
-            next_Qvs = m1(nstates)
-            max_next_Qvs = np.max(next_Qvs, axis = 1)
-
-            tgt_Qvs = (rewards + (1 - dones) * gamma * max_next_Qvs)
-            tgt_Qvs = tgt_Qvs.reshape(-1, 1)
-
-            mask = tf.one_hot(actions, nouts)
-            with tf.GradientTape() as tape:
-                all_Qvs = m1(states)
-                Qvs = tf.reduce_sum(all_Qvs * mask, axis = 1, keepdims = True)
-                loss = tf.reduce_mean(loss_ftn(tgt_Qvs, Qvs))
-
-            grads = tape.gradient(loss, m1.trainable_variables)
-            optimizer.apply_gradients(zip(grads, m1.trainable_variables))
+        if len(rbf1) >= batch_size:
+            train(tf, m1, rbf1, batch_size, loss_ftn, optimizer, gamma, nouts)
 
     # Training loop
     finals = []
