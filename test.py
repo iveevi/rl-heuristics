@@ -116,31 +116,39 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
         for s in range(steps):
             # TODO: function
-            r = np.random()
+            r = np.random.rand()
             if r < eps:
+                print('Heurestic action')
+                action1 = heurestic(state1)
+                action2 = heurestic(state2)
                 pass
             elif r < eps + keps:    # Teacher-student or peer-peer here
+                print('Tutoring!!')
                 pass
             else:
-                pass
-                action1 = np.argmax(Qvs[0])
+                print('DNN action')
+                Qvs1 = m1(state1[np.newaxis])
+                Qvs2 = m2(state2[np.newaxis])
+                
+                action1 = np.argmax(Qvs1[0])
+                action2 = np.argmax(Qvs2[0])
 
             # TODO: action in another function
             # Get the action (Agent 1)
-            if np.random.rand() < eps:
-                action1 = heurestic(state1)
-                # action2 = heurestic(state)
-            else:
-                Qvs = m1(state1[np.newaxis])
-                action1 = np.argmax(Qvs[0])
+            # if np.random.rand() < eps:
+            #     action1 = heurestic(state1)
+            #     # action2 = heurestic(state)
+            # else:
+            #     Qvs = m1(state1[np.newaxis])
+            #     action1 = np.argmax(Qvs[0])
 
             # Get the action (Agent 2)
-            if np.random.rand() < eps:
-                action2 = heurestic(state2)
-                # action2 = heurestic(state)
-            else:
-                Qvs = m2(state2[np.newaxis])
-                action2 = np.argmax(Qvs[0])
+            # if np.random.rand() < eps:
+            #     action2 = heurestic(state2)
+            #    # action2 = heurestic(state)
+            # else:
+            #    Qvs = m2(state2[np.newaxis])
+            #    action2 = np.argmax(Qvs[0])
 
             # Apply the action and update the state (TODO: another function)
             if not done1:
@@ -220,4 +228,4 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
 
 run('CartPole-v1', [[4], 2, [32, 'elu'], [32, 'elu']],
         Heurestic('Egreedy', theta_omega), LinearDecay(60, 20),
-        1, 100, 500)
+        1, 100, 10)
