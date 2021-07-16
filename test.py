@@ -42,7 +42,7 @@ def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
 # If a skeleton becomes necessary use a list of some named tuples, or smthing
-def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
+def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     import tensorflow as tf
 
     from tensorflow import keras
@@ -94,6 +94,7 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     buf2 = ScoreBuffer()
 
     epsilons = []
+    kepsilons = []
 
     id = ename + ': Tutoring with ' + scheduler.name + ': ' + str(trial)
 
@@ -118,37 +119,26 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
             # TODO: function
             r = np.random.rand()
             if r < eps:
-                print('Heurestic action')
                 action1 = heurestic(state1)
                 action2 = heurestic(state2)
                 pass
             elif r < eps + keps:    # Teacher-student or peer-peer here
-                print('Tutoring!!')
-                pass
-            else:
-                print('DNN action')
-                Qvs1 = m1(state1[np.newaxis])
-                Qvs2 = m2(state2[np.newaxis])
-                
+                if buf1.average() > buf2.average():
+                    model = m1
+                else:
+                    model = m2
+
+                Qvs1 = model(state1[np.newaxis])
+                Qvs2 = model(state2[np.newaxis])
+
                 action1 = np.argmax(Qvs1[0])
                 action2 = np.argmax(Qvs2[0])
+            else:
+                Qvs1 = m1(state1[np.newaxis])
+                Qvs2 = m2(state2[np.newaxis])
 
-            # TODO: action in another function
-            # Get the action (Agent 1)
-            # if np.random.rand() < eps:
-            #     action1 = heurestic(state1)
-            #     # action2 = heurestic(state)
-            # else:
-            #     Qvs = m1(state1[np.newaxis])
-            #     action1 = np.argmax(Qvs[0])
-
-            # Get the action (Agent 2)
-            # if np.random.rand() < eps:
-            #     action2 = heurestic(state2)
-            #    # action2 = heurestic(state)
-            # else:
-            #    Qvs = m2(state2[np.newaxis])
-            #    action2 = np.argmax(Qvs[0])
+                action1 = np.argmax(Qvs1[0])
+                action2 = np.argmax(Qvs2[0])
 
             # Apply the action and update the state (TODO: another function)
             if not done1:
@@ -187,45 +177,66 @@ def run(ename, skeleton, heurestic, schedref, trial, episodes, steps):
         #    notify.log(msg + f' [{fmt2}]')
 
         epsilons.append(eps)
+        kepsilons.append(keps)
+
         eps = scheduler()
         keps = (1 - eps)/2
 
         # Train the model if the rbf is full enough
         if len(rbf1) >= batch_size:
             train(tf, m1, rbf1, batch_size, loss_ftn, optimizer, gamma, nouts)
-        
+
         if len(rbf2) >= batch_size:
             train(tf, m2, rbf2, batch_size, loss_ftn, optimizer, gamma, nouts)
 
-    # Training loop
+    # Bench loop (TODO: another function)
     finals1 = []
+    finals2 = []
+
     for e in range(bench_episodes):
         # Get the first observation
         state1 = env1.reset()
+        state2 = env2.reset()
+
         score1 = 0
+        score2 = 0
+
+        done1 = False
+        done2  = False
 
         for s in range(steps):
             # Get the action
             Qvs1 = m1(state1[np.newaxis])
-            action = np.argmax(Qvs1[0])
+            Qvs2 = m2(state2[np.newaxis])
+
+            action1 = np.argmax(Qvs1[0])
+            action2 = np.argmax(Qvs2[0])
 
             # Apply the action and update the state
-            nstate1, reward1, done1, info = env1.step(action)
-            state1 = nstate1
-            score1 += reward1
+            if not done1:
+                nstate1, reward1, done1, info = env1.step(action1)
+                state1 = nstate1
+                score1 += reward1
 
-            if done1:
+            if not done2:
+                nstate2, reward2, done2, info = env1.step(action2)
+                state2 = nstate2
+                score2 += reward2
+
+            if done1 and done2:
                 break
 
         finals1.append(score1)
+        finals2.append(score2)
 
     # Log completion
     msg = f'{id} finished in {fmt_time(time.time() - start)}'
     print(msg)
     # notify.notify(msg)
 
-    # return scores, epsilons, finals
+    return scores1, scores2, epsilons, kepsilons, finals1, finals2
 
-run('CartPole-v1', [[4], 2, [32, 'elu'], [32, 'elu']],
-        Heurestic('Egreedy', theta_omega), LinearDecay(60, 20),
-        1, 100, 10)
+rets = run_tutoring('CartPole-v1', [[4], 2, [32, 'elu'], [32, 'elu']],
+        Heurestic('Egreedy', egreedy), LinearDecay(800, 50),
+        1, 1500, 500)
+print(rets)
