@@ -13,6 +13,7 @@ from scheduler import *
 from heurestics import *
 from upload import *
 from time_buffer import *
+from score_buffer import *
 
 # Global variables
 bench_episodes = 50
@@ -30,9 +31,10 @@ environments = {
             LinearDecay(800, 50),
             DampedOscillator(800, 50)
         ],
-        'trials': 5,
-        'episodes': 1500,
-        'steps': 500
+        'trials': 2,
+        'episodes': 2,
+        'steps': 500,
+        'ts-tutoring': True
     }
 }
 
@@ -433,15 +435,29 @@ for env in environments:
                 steps.append(ecp['steps'])
                 tutorings.append(False)
 
+    if ecp['ts-tutoring']:
+        for i in range(trials):
+            enames.append(env)
+            skeletons.append(ecp['skeleton'])
+            hrs.append(heurestics[0])
+            scs.append(schedulers[0])
+            trialns.append(i + 1)
+            episodes.append(ecp['episodes'])
+            steps.append(ecp['steps'])
+            tutorings.append(True)
+
 # Launch the processes
 start = time.time()
+notify.su_off = True
 
 # TODO: need a away to split the arguments (ie. batch the sessions so that we
 # dont run out of memory)
 pool = ProcessPool(len(enames))
 rets = pool.map(run, enames, skeletons, hrs, scs, trialns, episodes, steps, tutorings)
 
-# Write the data
+print(rets)
+
+''' Write the data
 dir = setup(environments)
 index = 0
 for env in environments:
@@ -453,7 +469,7 @@ for env in environments:
             index += trials
 
 # Upload
-upload(dir, sudo = False)
+upload(dir, sudo = False)'''
 
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dir}`'
