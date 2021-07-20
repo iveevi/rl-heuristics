@@ -186,7 +186,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     notify.notify(msg)
 
-    return scores, epsilons, finals
+    return scores, epsilons, np.average(finals)
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     import tensorflow as tf
@@ -365,7 +365,7 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
                 score1 += reward1
 
             if not done2:
-                nstate2, reward2, done2, info = env1.step(action2)
+                nstate2, reward2, done2, info = env2.step(action2)
                 state2 = nstate2
                 score2 += reward2
 
@@ -380,14 +380,14 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     # notify.notify(msg)
 
-    return scores1, scores2, epsilons, kepsilons, finals1, finals2
+    return scores1, scores2, epsilons, kepsilons, np.average(finals1), np.average(finals2)
 
 # TODO: change tutoring to an integer (to diff between teacher-student and peer-peer)
 def run(ename, skeleton, heurestic, schedref, trial, episodes, steps, tutoring):
     if tutoring:
-        run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps)
+        return run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps)
     else:
-        run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps)
+        return run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps)
 
 def write_data(fpath, rets, episodes):
     fout = open(fpath, 'w')
