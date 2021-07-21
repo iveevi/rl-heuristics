@@ -400,11 +400,27 @@ def write_data(fpath, rets, episodes):
         fout.write(', '.join([f'Trial #{i}'] + [str(s) for s in scores]) + '\n')
         i += 1
 
-    fout.write(', '.join(['Bench Episodes'] + [str(i) for i in range(1, bench_episodes + 1)]) + '\n')
-
     i = 1
     for scores, epsilon, finals in rets:
-        fout.write(', '.join([f'Bench Trial #{i}'] + [str(s) for s in finals]) + '\n')
+        fout.write(f'Bench Trial #{i}, {finals}\n')
+        i += 1
+
+def write_tutoring_data(fpath, rets, episodes):
+    fout = open(fpath, 'w')
+
+    fout.write(', '.join(['Episodes'] + [str(i) for i in range(1, episodes + 1)]) + '\n')
+    fout.write(', '.join(['Epsilon'] + [str(i) for i in rets[0][1]]) + '\n')
+
+    i = 1
+    for scores1, scores2, epsilon, keps, finals1, finals2 in rets:
+        fout.write(', '.join([f'Agent (1) #{i}'] + [str(s) for s in scores1]) + '\n')
+        fout.write(', '.join([f'Agent (2) #{i}'] + [str(s) for s in scores2]) + '\n')
+        i += 1
+
+    i = 1
+    for scores1, scores2, epsilon, keps, finals1, finals2 in rets:
+        fout.write(f'Bench (1) #{i}, {finals1}\n')
+        fout.write(f'Bench (1) #{i}, {finals2}\n')
         i += 1
 
 # Loading up the arguments
@@ -457,7 +473,7 @@ rets = pool.map(run, enames, skeletons, hrs, scs, trialns, episodes, steps, tuto
 
 print(rets)
 
-''' Write the data
+# Write the data
 dir = setup(environments)
 index = 0
 for env in environments:
@@ -467,9 +483,14 @@ for env in environments:
             fpath = dir + '/' + env + '/' + (hr.name + '_and_' + sc.name).replace(' ', '_') + '.csv'
             write_data(fpath, rets[index : index + trials], environments[env]['episodes'])
             index += trials
+    
+    if environments[env]['ts-tutoring']:
+        fpath = dir + '/' + env + '/TS_Tutoring.csv'
+        write_tutoring_data(fpath, rets[index : index + trials], environments[env]['episodes'])
+        index += trials
 
 # Upload
-upload(dir, sudo = False)'''
+# upload(dir, sudo = False)
 
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dir}`'

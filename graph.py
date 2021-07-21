@@ -8,13 +8,10 @@ import seaborn as sns
 sns.set_theme()
 def graph_file(path):
     # Create the subplot (and change the theme)
-    # plt.style.use('ggplot')
-
     fig = plt.figure(figsize = (8, 6))
 
-    scores = fig.add_subplot(3, 2, (1, 3))
-    eps = fig.add_subplot(3, 2, 5)
-    finals = fig.add_subplot(1, 2, 2)
+    scores = fig.add_subplot(3, 1, (1, 2))
+    eps = fig.add_subplot(3, 1, 3)
 
     spi = 0
     for i in range(len(path)):
@@ -46,25 +43,26 @@ def graph_file(path):
 
     feps = lines[final].split(',')
     feps = [float(s) for s in feps[1:]]
+
+    benchs = []
     for line in lines[final + 1:]:
         split = line.split(',')
 
         label = split[0]
         values = split[1:]
 
-        finals.plot(feps, [float(s) for s in values], label = label)
+        benchs.append(values[0])
+    
+    print('Bench trials:', benchs)
 
     eps.plot(episodes, [float(s) for s in epsilons[1:]], label = 'Epsilon')
 
     # Axis labels
-    finals.set_ylabel('Bench Scores')
     scores.set_ylabel('Scores')
     eps.set_ylabel('Epsilon')
     eps.set_xlabel('Episodes')
-    finals.set_xlabel('Episodes')
 
     # Legends
-    finals.legend()
     scores.legend()
     eps.legend()
 
@@ -77,10 +75,9 @@ def graph_file(path):
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
         loc = pdfs + path[spi + 1:-4] + '.pdf'
-        print(f'Saving to {loc}...\n')
+        print(f'Saving to {loc}...')
         fig.savefig(loc)
-    else:
-        print()
+    print()
 
 def file_averages(path):
     # Read the file
@@ -107,14 +104,39 @@ def file_averages(path):
 
     return (trials_average, finals_average)
 
+def tutoring_averages(path):
+    # Read the file
+    file = open(path)
+    lines = [line[:-1] for line in file.readlines()]
+
+    final = 0
+    while lines[final][0] != 'B': final += 1
+
+    trials = [
+        [float(s) for s in (line.split(','))[1:]] for line in lines[2:final - 1]
+    ]
+
+    finals_average = [
+        float(line.split(',')[1]) for line in lines[final:]
+    ]
+
+    print('finals: ', finals_average)
+
+    trials_average = np.average(trials, axis = 0).tolist()
+
+    policy = path[path.rindex('/') + 1: -4]
+    print('\n' + policy + ', average training score:', np.average(trials_average))
+    print(policy + ', average bench score:', np.average(finals_average))
+
+    return trials_average
+
 def graph_full_environment(path, files):
     # Setup the figure
     plt.style.use('ggplot')
 
     fig = plt.figure(figsize = (8, 6))
 
-    trials = fig.add_subplot(2, 1, 1)
-    finals = fig.add_subplot(2, 1, 2)
+    trials = fig.add_subplot(1, 1, 1)
 
     spi = 0
     for i in range(len(path)):
@@ -125,36 +147,26 @@ def graph_full_environment(path, files):
     fig.suptitle(f'Statistics For Environment {title}')
 
     # Collect averages
-    avgs = [file_averages(path + '/' + file) for file in files]
+    avgs = [file_averages(path + '/' + file) for file in files if file != 'TS_Tutoring.csv']
 
-    trials_averages = [tavgs for tavgs, favgs in avgs]
-    finals_averages = [favgs for tavgs, favgs in avgs]
+    tutoring_averages(path + '/TS_Tutoring.csv')
 
     # Assume the lengths are the same
-    tlen = len(avgs[0][0])
-    flen = len(avgs[0][1])
+    tlen = len(avgs[0])
 
     # Episodes for each
     teps = [i + 1 for i in range(tlen)]
-    feps = [i + 1 for i in range(flen)]
 
     # Plot
-    for i in range(len(trials_averages)):
-        trials.plot(teps, trials_averages[i], label = (files[i])[:-4].replace('_', ' '))
-
-    for i in range(len(finals_averages)):
-        finals.plot(feps, finals_averages[i], label = (files[i])[:-4].replace('_', ' '))
+    for i in range(len(avgs)):
+        trials.plot(teps, avgs[i], label = (files[i])[:-4].replace('_', ' '))
 
     # Axis labels
     trials.set_ylabel('Trial Scores')
     trials.set_xlabel('Episode')
 
-    finals.set_ylabel('Final Scores')
-    finals.set_xlabel('Episode')
-
     # Legends
     trials.legend()
-    finals.legend()
 
     fig.tight_layout()
     plt.show()
@@ -165,10 +177,9 @@ def graph_full_environment(path, files):
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
         loc = pdfs + path[spi + 1:] + '.pdf'
-        print(f'Saving to {loc}...\n')
+        print(f'Saving to {loc}...')
         fig.savefig(loc)
-    else:
-        print()
+    print()
 
 def graph_environment(path):
     # List of directories
