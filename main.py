@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from copy import copy
 from collections import deque
 # from pathos.multiprocessing import ProcessPool # Do we even need this
-from multiprocessing import Lock, Process
+from multiprocessing import Lock, Process, Queue
 # from threading import Lock
 
 import notify
@@ -20,7 +20,7 @@ from score_buffer import *
 
 # Global variables
 bench_episodes = 50
-fdict = dict()
+rets = Queue()
 
 # Setup of environments: use YAML maybe
 environments = {
@@ -219,12 +219,9 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     notify.notify(msg)
 
-    global fdict
+    global rets
     fname = ename + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
-    if fname in fdict:
-        fdict[fname].append((scores, epsilons, np.average(finals)))
-    else:
-        fdict[fname] = [(scores, epsilons, np.average(finals))]
+    rets.put((fname, scores, epsilons, np.average(finals)))
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     import tensorflow as tf
@@ -503,7 +500,9 @@ while len(pool) > 0:
             del pool[i]
             break
 
-print('results (fdict): ', fdict)
+print('results (rets):')
+while not rets.empty():
+    print('\t' + str(rets.get()))
 
 # Launch the processes
 start = time.time()
