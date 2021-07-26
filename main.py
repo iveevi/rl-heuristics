@@ -2,10 +2,13 @@ import gym
 
 import numpy as np
 import matplotlib.pyplot as plt
+# import nvidia_smi
 
 from copy import copy
 from collections import deque
-from pathos.multiprocessing import ProcessPool
+# from pathos.multiprocessing import ProcessPool # Do we even need this
+from multiprocessing import Lock, Process
+# from threading import Lock
 
 import notify
 
@@ -17,24 +20,25 @@ from score_buffer import *
 
 # Global variables
 bench_episodes = 50
+fdict = dict()
 
 # Setup of environments: use YAML maybe
 environments = {
     'CartPole-v1': {
         'skeleton': [[4], 2, [32, 'elu'], [32, 'elu']],
         'heurestics': [
-            Heurestic('Egreedy', egreedy)
-            # Heurestic('Great HR', theta_omega)
-            # Heurestic('Bad HR', badhr)
+            Heurestic('Egreedy', egreedy),
+            Heurestic('Great HR', theta_omega),
+            Heurestic('Bad HR', badhr)
         ],
         'schedulers': [
             LinearDecay(800, 50),
             DampedOscillator(800, 50)
         ],
-        'trials': 2,
-        'episodes': 2,
+        'trials': 10,
+        'episodes': 15,
         'steps': 500,
-        'ts-tutoring': True
+        'ts-tutoring': False
     }
 }
 
@@ -68,7 +72,37 @@ def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
+memlock = Lock()
 def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
+    # Assume only using GPU 0 (for my system)
+    import nvidia_smi
+
+    # Named process id
+    scheduler = copy(schedref)
+    id = ename + ': ' + heurestic.name + ' and ' + scheduler.name + ': ' + str(trial)
+
+    # TODO: put in function
+    i = 0
+    while True:
+        memlock.acquire()
+
+        nvidia_smi.nvmlInit()
+
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
+        # info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        print(YELLOW + f'{id}, L{i}: Available GPU memory {info.free/info.total:%}' + RESET)
+        if info.free/info.total < 0.5:
+            print(RED + 'Reached 50% threshold, waiting (5s)...' + RESET)
+            memlock.release()
+            time.sleep(5)
+        else:
+            break
+
+        i += 1
+
+    # Now import tensorflow
     import tensorflow as tf
 
     from tensorflow import keras
@@ -97,7 +131,6 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     eps = 1
     rbf = deque(maxlen = 2000)  # Should be customizable
     batch_size = 32             # Should be customizable
-    scheduler = copy(schedref)
 
     gamma = 0.95                # Should be customizable
     loss_ftn = keras.losses.mean_squared_error
@@ -109,12 +142,12 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     scores = []
     epsilons = []
 
-    id = ename + ': ' + heurestic.name + ' and ' + scheduler.name + ': ' + str(trial)
-
     # Training loop
     tb = TimeBuffer(episodes)
     proj = 0
 
+    memlock.release()
+    print(GREEN + 'MUTEX RELEASED' + RESET)
     for e in range(episodes):
         # Get the first observation
         state = env.reset()
@@ -186,7 +219,12 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     notify.notify(msg)
 
-    return scores, epsilons, np.average(finals)
+    global fdict
+    fname = ename + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
+    if fname in fdict:
+        fdict[fname].append((scores, epsilons, np.average(finals)))
+    else:
+        fdict[fname] = [(scores, epsilons, np.average(finals))]
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     import tensorflow as tf
@@ -380,14 +418,23 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     # notify.notify(msg)
 
-    return scores1, scores2, epsilons, kepsilons, np.average(finals1), np.average(finals2)
+    global fdict
+    fname = env + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
+    if fname in fdict:
+        fdict[fname].append((scores1, scores2, epsilons, kepsilons, np.average(finals1),
+                np.average(finals2)))
+    else:
+        fdict[fname] = [(scores1, scores2, epsilons, kepsilons, np.average(finals1),
+                np.average(finals2))]
 
 # TODO: change tutoring to an integer (to diff between teacher-student and peer-peer)
 def run(ename, skeleton, heurestic, schedref, trial, episodes, steps, tutoring):
     if tutoring:
-        return run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps)
+        return run_tutoring(ename, skeleton, heurestic, schedref, trial,
+                episodes, steps)
     else:
-        return run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps)
+        return run_policy(ename, skeleton, heurestic, schedref, trial, episodes,
+                steps)
 
 def write_data(fpath, rets, episodes):
     fout = open(fpath, 'w')
@@ -423,15 +470,8 @@ def write_tutoring_data(fpath, rets, episodes):
         fout.write(f'Bench (1) #{i}, {finals2}\n')
         i += 1
 
-# Loading up the arguments
-enames = []
-skeletons = []
-hrs = []
-scs = []
-trialns = []
-episodes = []
-steps = []
-tutorings = []
+# Load up the processes
+pool = []
 
 for env in environments:
     ecp = environments[env]
@@ -442,37 +482,40 @@ for env in environments:
     for hr in heurestics:
         for sc in schedulers:
             for i in range(trials):
-                enames.append(env)
-                skeletons.append(ecp['skeleton'])
-                hrs.append(hr)
-                scs.append(sc)
-                trialns.append(i + 1)
-                episodes.append(ecp['episodes'])
-                steps.append(ecp['steps'])
-                tutorings.append(False)
+                pool.append(Process(target = run,
+                    args = (env, ecp['skeleton'], hr,
+                    sc, i + 1, ecp['episodes'], ecp['steps'],
+                    False, )))
 
-    if ecp['ts-tutoring']:
-        for i in range(trials):
-            enames.append(env)
-            skeletons.append(ecp['skeleton'])
-            hrs.append(heurestics[0])
-            scs.append(schedulers[0])
-            trialns.append(i + 1)
-            episodes.append(ecp['episodes'])
-            steps.append(ecp['steps'])
-            tutorings.append(True)
+# Launch the processes
+notify.su_off = True
+for proc in pool:
+    proc.start()
+
+while len(pool) > 0:
+    for i in range(len(pool)):
+        if not pool[i].is_alive():
+            # TODO: still need to retrieve results
+            pool[i].join()
+
+            print(GREEN + 'Another join!' + RESET)
+
+            del pool[i]
+            break
+
+print('results (fdict): ', fdict)
 
 # Launch the processes
 start = time.time()
-notify.su_off = True
 
 # TODO: need a away to split the arguments (ie. batch the sessions so that we
 # dont run out of memory)
-pool = ProcessPool(len(enames))
-rets = pool.map(run, enames, skeletons, hrs, scs, trialns, episodes, steps, tutorings)
+# pool = ProcessPool(len(enames))
+# rets = pool.map(run, enames, skeletons, hrs, scs, trialns, episodes, steps, tutorings)
 
-print(rets)
+# print(rets)
 
+'''
 # Write the data
 dir = setup(environments)
 index = 0
@@ -483,14 +526,15 @@ for env in environments:
             fpath = dir + '/' + env + '/' + (hr.name + '_and_' + sc.name).replace(' ', '_') + '.csv'
             write_data(fpath, rets[index : index + trials], environments[env]['episodes'])
             index += trials
-    
+
     if environments[env]['ts-tutoring']:
         fpath = dir + '/' + env + '/TS_Tutoring.csv'
         write_tutoring_data(fpath, rets[index : index + trials], environments[env]['episodes'])
         index += trials
 
 # Upload
-# upload(dir, sudo = False)
+upload(dir)
+'''
 
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dir}`'
