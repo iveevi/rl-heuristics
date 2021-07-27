@@ -21,6 +21,7 @@ from score_buffer import *
 # Global variables
 bench_episodes = 50
 rets = Queue()
+memlock = Lock()
 
 # Setup of environments: use YAML maybe
 environments = {
@@ -72,7 +73,6 @@ def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-memlock = Lock()
 def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     # Assume only using GPU 0 (for my system)
     import nvidia_smi
@@ -92,7 +92,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
         info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
 
         # info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-        print(YELLOW + f'{id}, L{i}: Available GPU memory {info.free/info.total:%}' + RESET)
+        print(YELLOW + '[CHECK]' + RESET + f' {id}, L{i}: Available GPU memory {info.free/info.total:%}')
         if info.free/info.total < 0.5:
             print(RED + 'Reached 50% threshold, waiting (5s)...' + RESET)
             memlock.release()
@@ -147,7 +147,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     proj = 0
 
     memlock.release()
-    print(GREEN + 'MUTEX RELEASED' + RESET)
+    print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
     for e in range(episodes):
         # Get the first observation
         state = env.reset()
@@ -219,11 +219,39 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     notify.notify(msg)
 
-    global rets
+    # Record the results
     fname = ename + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
-    rets.put((fname, scores, epsilons, np.average(finals)))
+    rets.put((fname, (scores, epsilons, np.average(finals))))
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
+    # Assume only using GPU 0 (for my system)
+    import nvidia_smi
+
+    # Named process id
+    scheduler = copy(schedref)
+    id = ename + ': Tutoring (TS): ' + str(trial)
+
+    # TODO: put in function
+    i = 0
+    while True:
+        memlock.acquire()
+
+        nvidia_smi.nvmlInit()
+
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
+        # info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        print(YELLOW + '[CHECK]' + RESET + f' {id}, L{i}: Available GPU memory {info.free/info.total:%}')
+        if info.free/info.total < 0.5:
+            print(RED + 'Reached 50% threshold, waiting (5s)...' + RESET)
+            memlock.release()
+            time.sleep(5)
+        else:
+            break
+
+        i += 1
+    
     import tensorflow as tf
 
     from tensorflow import keras
@@ -415,14 +443,10 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps):
     print(msg)
     # notify.notify(msg)
 
-    global fdict
+    # Record the results
     fname = env + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
-    if fname in fdict:
-        fdict[fname].append((scores1, scores2, epsilons, kepsilons, np.average(finals1),
-                np.average(finals2)))
-    else:
-        fdict[fname] = [(scores1, scores2, epsilons, kepsilons, np.average(finals1),
-                np.average(finals2))]
+    rets.put((fname, (scores1, scores2, epsilons, kepsilons, np.average(finals1),
+                np.average(finals2))))
 
 # TODO: change tutoring to an integer (to diff between teacher-student and peer-peer)
 def run(ename, skeleton, heurestic, schedref, trial, episodes, steps, tutoring):
@@ -485,7 +509,9 @@ for env in environments:
                     False, )))
 
 # Launch the processes
+start = time.time()
 notify.su_off = True
+
 for proc in pool:
     proc.start()
 
@@ -500,40 +526,34 @@ while len(pool) > 0:
             del pool[i]
             break
 
+# Collect and sort the results
+files = dict()
 print('results (rets):')
 while not rets.empty():
+    fname, vs = rets.get()
+
+    if fname in files:
+        files[fname].append(vs)
+    else:
+        files[fname] = [vs]
     print('\t' + str(rets.get()))
 
-# Launch the processes
-start = time.time()
-
-# TODO: need a away to split the arguments (ie. batch the sessions so that we
-# dont run out of memory)
-# pool = ProcessPool(len(enames))
-# rets = pool.map(run, enames, skeletons, hrs, scs, trialns, episodes, steps, tutorings)
-
-# print(rets)
-
-'''
-# Write the data
+# Write data
 dir = setup(environments)
-index = 0
-for env in environments:
-    trials = environments[env]['trials']
-    for hr in heurestics:
-        for sc in schedulers:
-            fpath = dir + '/' + env + '/' + (hr.name + '_and_' + sc.name).replace(' ', '_') + '.csv'
-            write_data(fpath, rets[index : index + trials], environments[env]['episodes'])
-            index += trials
+for file in files:
+    trials = files[file]
+    i = file.find('/')
+    ename = file[:i]
 
-    if environments[env]['ts-tutoring']:
-        fpath = dir + '/' + env + '/TS_Tutoring.csv'
-        write_tutoring_data(fpath, rets[index : index + trials], environments[env]['episodes'])
-        index += trials
+    # Regular policy trials
+    if len(trials[0]) == 3:
+        write_data(dir + '/' + file, trials, environments[ename]['episodes'])
+    # Tutoring policy trials
+    else:
+        write_tutoring_data(dir + '/' + file, trials, environments[ename]['episodes'])
 
-# Upload
+# Upload data
 upload(dir)
-'''
 
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dir}`'
