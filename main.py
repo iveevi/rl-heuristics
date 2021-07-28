@@ -518,7 +518,7 @@ for env in environments:
                 # TODO: use run_polciy right away
                 pool.append(Process(target = run,
                     args = (env, ecp['skeleton'], hr,
-                    sc, i + 1, ecp['episodes'], ecp['steps'], index,
+                    sc, i, ecp['episodes'], ecp['steps'], index,
                     False, )))
                 print('Adding \"' + env + ': ' + hr.name + ' and ' + sc.name +
                         ': ' + str(i + 1) + '\" as index #' + str(index))
@@ -530,9 +530,9 @@ for env in environments:
         for i in range(trials):
             pool.append(Process(target = run,
                 args = (env, ecp['skeleton'], heurestics[0],
-                schedulers[0], i + 1, ecp['episodes'], ecp['steps'], index,
+                schedulers[0], i, ecp['episodes'], ecp['steps'], index,
                 True, )))
-            print('Adding \"' + env + ': TS-Tutoring: ' + str(i) + '\" as index #' + str(index))
+            print('Adding \"' + env + ': TS-Tutoring: ' + str(i + 1) + '\" as index #' + str(index))
             ids.append(env + ': TS-Tutoring: ' + str(i + 1))
             index += 1
 
