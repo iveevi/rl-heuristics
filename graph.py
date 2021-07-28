@@ -52,7 +52,7 @@ def graph_file(path):
         values = split[1:]
 
         benchs.append(values[0])
-    
+
     print('Bench trials:', benchs)
 
     eps.plot(episodes, [float(s) for s in epsilons[1:]], label = 'Epsilon')
