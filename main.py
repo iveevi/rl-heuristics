@@ -1,8 +1,6 @@
 import gym
 
 import numpy as np
-import matplotlib.pyplot as plt
-# import nvidia_smi
 
 from copy import copy
 from collections import deque
@@ -39,7 +37,7 @@ environments = {
             DampedOscillator(800, 50)
         ],
         'trials': 10,
-        'episodes': 50,
+        'episodes': 100,
         'steps': 500,
         'ts-tutoring': True
     }
@@ -75,16 +73,18 @@ def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps,
-        index):
+def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):
+    '''
     # Assume only using GPU 0 (for my system)
     import nvidia_smi
+    '''
 
     # Named process id
     scheduler = copy(schedref)
     id = ename + ': ' + heurestic.name + ' and ' + scheduler.name + ': ' + \
         str(trial + 1)
 
+    '''
     # TODO: put in function
     i = 0
     while True:
@@ -105,6 +105,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps,
             break
 
         i += 1
+    '''
 
     # Now import tensorflow
     import tensorflow as tf
@@ -150,7 +151,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps,
     tb = TimeBuffer(episodes)
     proj = 0
 
-    memlock.release()
+    # memlock.release()
     # print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
     for e in range(episodes):
         # Get the first observation
@@ -220,23 +221,31 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps,
 
     # Log completion
     msg = f'{id} (index = {index}) finished in {fmt_time(time.time() - start)}'
-    print(msg)
+    print(GREEN + msg + RESET)
     notify.notify(msg)
 
     # Record the results
-    fname = ename + '/' + (heurestic.name + '_and_' + scheduler.name).replace(' ', '_') + '.csv'
-    rets.put((fname, (scores, epsilons, np.average(finals))))
-    alive.put(index)
+    pdir = dirn + '/' + ename + '/' + (heurestic.name + '_and_' + \
+        scheduler.name).replace(' ', '_')
+    os.system(f'mkdir -p {pdir}')
+    fname = pdir + f'/Trial_{trial + 1}.csv'
+    fout = open(fname, 'w')
+    fout.write('Testing file...')
+    fout.close()
 
-def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps,
-        index):
+def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):
+    '''
     # Assume only using GPU 0 (for my system)
     import nvidia_smi
+    '''
 
     # Named process id
     scheduler = copy(schedref)
     id = ename + ': Tutoring (TS): ' + str(trial + 1)
 
+    # print(f'TS-Tutoring id = {id}, index %{index}')
+
+    '''
     # TODO: put in function
     i = 0
     while True:
@@ -257,6 +266,7 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps,
             break
 
         i += 1
+    '''
 
     import tensorflow as tf
 
@@ -311,14 +321,12 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps,
     epsilons = []
     kepsilons = []
 
-    id = ename + ': Tutoring with ' + scheduler.name + ': ' + str(trial)
-
     # Training loop
     tb = TimeBuffer(episodes)
     proj = 0
 
-    memlock.release()
-    print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
+    # memlock.release()
+    # print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
     for e in range(episodes):
         # Get the first observation
         state1 = env1.reset()
@@ -448,24 +456,16 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps,
 
     # Log completion
     msg = f'{id} (index = {index}) finished in {fmt_time(time.time() - start)}'
-    print(msg)
+    print(GREEN + msg + RESET)
     # notify.notify(msg)
 
     # Record the results
-    fname = env + '/TS_Tutoring.csv'
-    rets.put((fname, (scores1, scores2, epsilons, kepsilons, np.average(finals1),
-                np.average(finals2))))
-    alive.put(index)
-
-# TODO: change tutoring to an integer (to diff between teacher-student and peer-peer)
-def run(ename, skeleton, heurestic, schedref, trial, episodes, steps, index,
-        tutoring):
-    if tutoring:
-        run_tutoring(ename, skeleton, heurestic, schedref, trial,
-                episodes, steps, index)
-    else:
-        run_policy(ename, skeleton, heurestic, schedref, trial, episodes,
-                steps, index)
+    pdir = dirn + '/' + env + f'/TS_Tutoring'
+    os.system(f'mkdir -p {pdir}')
+    fname = pdir + f'/Trial_{trial + 1}.csv'
+    fout = open(fname, 'w')
+    fout.write('Testing file...')
+    fout.close()
 
 def write_data(fpath, rets, episodes):
     fout = open(fpath, 'w')
@@ -506,6 +506,7 @@ pool = []
 ids = []
 index = 0
 
+dirn = setup(environments)
 for env in environments:
     ecp = environments[env]
     heurestics = ecp['heurestics']
@@ -516,10 +517,9 @@ for env in environments:
         for sc in schedulers:
             for i in range(trials):
                 # TODO: use run_polciy right away
-                pool.append(Process(target = run,
+                pool.append(Process(target = run_policy,
                     args = (env, ecp['skeleton'], hr,
-                    sc, i, ecp['episodes'], ecp['steps'], index,
-                    False, )))
+                    sc, i, ecp['episodes'], ecp['steps'], dirn)))
                 print('Adding \"' + env + ': ' + hr.name + ' and ' + sc.name +
                         ': ' + str(i + 1) + '\" as index #' + str(index))
                 ids.append(env + ': ' + hr.name + ' and ' + sc.name + ': ' +
@@ -528,12 +528,11 @@ for env in environments:
 
     if ecp['ts-tutoring']:
         for i in range(trials):
-            pool.append(Process(target = run,
+            pool.append(Process(target = run_tutoring,
                 args = (env, ecp['skeleton'], heurestics[0],
-                schedulers[0], i, ecp['episodes'], ecp['steps'], index,
-                True, )))
-            print('Adding \"' + env + ': TS-Tutoring: ' + str(i + 1) + '\" as index #' + str(index))
-            ids.append(env + ': TS-Tutoring: ' + str(i + 1))
+                schedulers[0], i, ecp['episodes'], ecp['steps'], dirn)))
+            print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
+            ids.append(env + ': Tutoring (TS): ' + str(i + 1))
             index += 1
 
 # Launch the processes
@@ -543,45 +542,29 @@ notify.su_off = True
 for proc in pool:
     proc.start()
 
+# Start collection process
 dones = [False] * len(pool)
+
 k = 0
 while len(pool) > 0:
     count = dones.count(True)
-    print(f'Pool loop #{k}, count = {count}')
+    print(f'Pool loop #{k}, count = {count}, target = {len(pool)}')
 
     if count == len(pool):
         break
 
     k += 1
-    if not alive.empty():
-        # Tick off only one proc at a time
-        i = alive.get()
-
-        print(f'Got index {i}: {ids[i]}')
-
-        pool[i].join()
-        dones[i] = True
-
-        print(GREEN + f'Process index {i} finished -> ' + ids[i] + RESET)
-
-    '''
     for i in range(len(pool)):
         if not dones[i] and not pool[i].is_alive():
-            # TODO: still need to retrieve results
             pool[i].join()
             dones[i] = True
 
             print(GREEN + 'Process finished -> ' + ids[i] + RESET)
-    '''
-
-            # del pool[i]
-            # break
-        # elif not dones[i]:
-        #     print(f'Leftover {ids[i]}')
 
     # No need to check all the time
     time.sleep(1)
 
+'''
 # Collect and sort the results
 files = dict()
 print('results (rets):')
@@ -593,7 +576,9 @@ for proc in pool:
     else:
         files[fname] = [vs]
     print('\t' + str((fname, vs)))
+'''
 
+'''
 # Write data
 dir = setup(environments)
 for file in files:
@@ -610,8 +595,9 @@ for file in files:
 
 # Upload data
 upload(dir)
+'''
 
 # Log completion
-msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dir}`'
+msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dirn}`'
 print(msg)
 notify.notify(msg)
