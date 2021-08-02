@@ -21,25 +21,38 @@ bench_episodes = 50
 alive = Queue()
 rets = Queue()
 memlock = Lock()
-memthresh = 0.35
+memthresh = 0.3
 
-# Setup of environments: use YAML maybe
+# Setup of environments
+# TODO: use YAML maybe
 environments = {
+    # TODO: remove steps, just use the steps from the environments
     'CartPole-v1': {
         'skeleton': [[4], 2, [32, 'elu'], [32, 'elu']],
         'heurestics': [
             Heurestic('Egreedy', egreedy),
-            Heurestic('Great HR', theta_omega),
-            Heurestic('Bad HR', badhr)
+            Heurestic('Great', theta_omega),
+            Heurestic('Hybrid', hybrid),
+            Heurestic('Bad', badhr)
         ],
         'schedulers': [
             LinearDecay(800, 50),
-            DampedOscillator(800, 50)
+            DampedOscillator(800, 50, 50, 0.1, 'DO1'),
+            DampedOscillator(800, 100, 100, 0.1, 'DO2'),    # Larger period
+            DampedOscillator(1200, 50, 50, 0.1, 'DO1_Ext')  # Extended oscillation
         ],
         'trials': 10,
-        'episodes': 100,
+        'episodes': 1500,
         'steps': 500,
-        'ts-tutoring': True
+        'ts-tutoring': True,
+        'ts-heurestics': [
+            Heurestic('Egreedy', egreedy),
+            Heurestic('Great', theta_omega)
+        ],
+        'ts-schedulers': [
+            LinearDecay(800, 50),
+            DampedOscillator(800, 50, 50, 0.1, 'DO1')
+        ]
     }
 }
 
@@ -74,17 +87,14 @@ def train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
 def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):
-    '''
     # Assume only using GPU 0 (for my system)
     import nvidia_smi
-    '''
 
     # Named process id
     scheduler = copy(schedref)
     id = ename + ': ' + heurestic.name + ' and ' + scheduler.name + ': ' + \
         str(trial + 1)
 
-    '''
     # TODO: put in function
     i = 0
     while True:
@@ -105,7 +115,6 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dir
             break
 
         i += 1
-    '''
 
     # Now import tensorflow
     import tensorflow as tf
@@ -151,7 +160,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dir
     tb = TimeBuffer(episodes)
     proj = 0
 
-    # memlock.release()
+    memlock.release()
     # print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
     for e in range(episodes):
         # Get the first observation
@@ -230,22 +239,22 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dir
     os.system(f'mkdir -p {pdir}')
     fname = pdir + f'/Trial_{trial + 1}.csv'
     fout = open(fname, 'w')
-    fout.write('Testing file...')
+    fout.writelines([
+        'Epsilons, ' + ','.join([str(e) for e in epsilons]) + '\n',
+        'Scores, ' + ','.join([str(s) for s in scores]) + '\n',
+        'Finals, ' + ','.join([str(f) for f in finals])
+    ])
     fout.close()
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):
-    '''
     # Assume only using GPU 0 (for my system)
     import nvidia_smi
-    '''
 
     # Named process id
     scheduler = copy(schedref)
-    id = ename + ': Tutoring (TS): ' + str(trial + 1)
+    id = ename + ': TS: ' + heurestic.name + ' and ' + \
+            scheduler.name + ': ' + str(trial + 1)
 
-    # print(f'TS-Tutoring id = {id}, index %{index}')
-
-    '''
     # TODO: put in function
     i = 0
     while True:
@@ -266,7 +275,6 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
             break
 
         i += 1
-    '''
 
     import tensorflow as tf
 
@@ -325,7 +333,7 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
     tb = TimeBuffer(episodes)
     proj = 0
 
-    # memlock.release()
+    memlock.release()
     # print(YELLOW + '[CHECK]' + RESET + ' MEMLOCK MUTEX RELEASED!')
     for e in range(episodes):
         # Get the first observation
@@ -457,14 +465,22 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
     # Log completion
     msg = f'{id} (index = {index}) finished in {fmt_time(time.time() - start)}'
     print(GREEN + msg + RESET)
-    # notify.notify(msg)
+    notify.notify(msg)
 
     # Record the results
-    pdir = dirn + '/' + env + f'/TS_Tutoring'
+    pdir = dirn + '/' + env + '/TS_Tutoring'
     os.system(f'mkdir -p {pdir}')
     fname = pdir + f'/Trial_{trial + 1}.csv'
     fout = open(fname, 'w')
     fout.write('Testing file...')
+    fout.writelines([
+        'Epsilons, ' + ','.join([str(e) for e in epsilons]) + '\n',
+        'Kepsilons, ' + ','.join([str(e) for e in kepsilons]) + '\n',
+        'Scores A1, ' + ','.join([str(s) for s in scores1]) + '\n',
+        'Scores A2, ' + ','.join([str(s) for s in scores2]) + '\n',
+        'Finals A1, ' + ','.join([str(f) for f in finals1]) + '\n',
+        'Finals A2, ' + ','.join([str(f) for f in finals2])
+    ])
     fout.close()
 
 def write_data(fpath, rets, episodes):
@@ -526,14 +542,18 @@ for env in environments:
                         str(i + 1))
                 index += 1
 
+    heurestics = ecp['ts-heurestics']
+    schedulers = ecp['ts-schedulers']
     if ecp['ts-tutoring']:
-        for i in range(trials):
-            pool.append(Process(target = run_tutoring,
-                args = (env, ecp['skeleton'], heurestics[0],
-                schedulers[0], i, ecp['episodes'], ecp['steps'], dirn)))
-            print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
-            ids.append(env + ': Tutoring (TS): ' + str(i + 1))
-            index += 1
+        for hr in heurestics:
+            for sc in schedulers:
+                for i in range(trials):
+                    pool.append(Process(target = run_tutoring,
+                        args = (env, ecp['skeleton'], hr, sc,
+                        i, ecp['episodes'], ecp['steps'], dirn)))
+                    print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
+                    ids.append(env + ': Tutoring (TS): ' + str(i + 1))
+                    index += 1
 
 # Launch the processes
 start = time.time()
@@ -564,38 +584,8 @@ while len(pool) > 0:
     # No need to check all the time
     time.sleep(1)
 
-'''
-# Collect and sort the results
-files = dict()
-print('results (rets):')
-for proc in pool:
-    fname, vs = rets.get()
-
-    if fname in files:
-        files[fname].append(vs)
-    else:
-        files[fname] = [vs]
-    print('\t' + str((fname, vs)))
-'''
-
-'''
-# Write data
-dir = setup(environments)
-for file in files:
-    trials = files[file]
-    i = file.find('/')
-    ename = file[:i]
-
-    # Regular policy trials
-    if len(trials[0]) == 3:
-        write_data(dir + '/' + file, trials, environments[ename]['episodes'])
-    # Tutoring policy trials
-    else:
-        write_tutoring_data(dir + '/' + file, trials, environments[ename]['episodes'])
-
 # Upload data
 upload(dir)
-'''
 
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dirn}`'

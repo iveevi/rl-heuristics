@@ -52,7 +52,8 @@ class DampedOscillator(DelayedScheduler):
     @param m the minimum value of the scheduler
     @param p the period of the oscillation
     '''
-    def __init__(self, episodes, lag = 0, p = 50, m = 0.1):
+    def __init__(self, episodes, lag = 0, p = 50, m = 0.1,
+            name = 'DampedOscillator'):
         alpha = math.log((1 - m)/self.epsilon)/episodes
 
         base = lambda e : (1 - m) * math.exp(-alpha * e) + m
@@ -60,11 +61,13 @@ class DampedOscillator(DelayedScheduler):
 
         ftn = lambda e : base(e) + osc(e)
 
-        super().__init__('Damped Oscillator', lag, ftn)
+        super().__init__(name, lag, ftn)
 
         # Additonal params
         self.episodes = episodes
         self.min = m
         self.period = p
+        self.name = name
     def __copy__(self):
-        return type(self)(self.episodes, self.lag, self.period, self.min)
+        return type(self)(self.episodes, self.lag, self.period, self.min,
+                self.name)

@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 class Heurestic:
@@ -22,3 +23,10 @@ def theta_omega(state):
         return 0 if w < 0 else 1
     else:
         return 0 if theta < 0 else 1
+
+# Mixed
+def hybrid(state):
+    if random.uniform(0, 1) > 0.5:
+        return egreedy(state)
+    else:
+        return theta_omega(state)
