@@ -1,17 +1,17 @@
 import gym
-
+import yaml
 import numpy as np
 
 from copy import copy
 from collections import deque
-# from pathos.multiprocessing import ProcessPool # Do we even need this
 from multiprocessing import Lock, Process, Queue
-# from threading import Lock
 
 import notify
+# from heurestics import *
+# from scheduler import *
+import heurestics
+import schedulers
 
-from scheduler import *
-from heurestics import *
 from upload import *
 from time_buffer import *
 from score_buffer import *
@@ -23,39 +23,23 @@ rets = Queue()
 memlock = Lock()
 memthresh = 0.3
 
-# Setup of environments
-# TODO: use YAML maybe
-environments = {
-    # TODO: remove steps, just use the steps from the environments
-    'CartPole-v1': {
-        'skeleton': [[4], 2, [32, 'elu'], [32, 'elu']],
-        'heurestics': [
-            Heurestic('Egreedy', egreedy),
-            Heurestic('Great', theta_omega),
-            Heurestic('Hybrid', hybrid),
-            Heurestic('Bad', badhr)
-        ],
-        'schedulers': [
-            LinearDecay(800, 50),
-            DampedOscillator(800, 50, 50, 0.1, 'DO1'),
-            DampedOscillator(800, 100, 100, 0.1, 'DO2'),    # Larger period
-            DampedOscillator(1200, 50, 50, 0.1, 'DO1_Ext')  # Extended oscillation
-        ],
-        'trials': 10,
-        'episodes': 1500,
-        'steps': 500,
-        'ts-tutoring': True,
-        'ts-heurestics': [
-            Heurestic('Egreedy', egreedy),
-            Heurestic('Great', theta_omega)
-        ],
-        'ts-schedulers': [
-            LinearDecay(800, 50),
-            DampedOscillator(800, 50, 50, 0.1, 'DO1')
-        ]
-    }
-}
+# Preprocess YAML file
+fout = open('config.yml', 'r')
+pre_envs = yaml.safe_load(fout) [0]['Environments']
 
+environments = dict()
+for env in pre_envs:
+	dicts = list(env.values())[0]
+
+	ndict = dict()
+	for d in dicts:
+		name = next(iter(d))
+		ndict[name] = d[name]
+	env = {next(iter(env)): ndict}
+
+	environments |= env
+
+# Sampling from replay buffers
 def sample(rbf, size):
     indices = np.random.randint(len(rbf), size = size)
     batch = [rbf[index] for index in indices]
@@ -525,12 +509,21 @@ index = 0
 dirn = setup(environments)
 for env in environments:
     ecp = environments[env]
-    heurestics = ecp['heurestics']
-    schedulers = ecp['schedulers']
+    hrs = ecp['heurestics']
+    scs = ecp['schedulers']
     trials = ecp['trials']
 
-    for hr in heurestics:
-        for sc in schedulers:
+    for hrd in hrs:
+        for scd in scs:
+            # Construct the heurestic from config
+            hrname = next(iter(hrd))
+            hr = getattr(heurestics, hrname)
+            hr = heurestics.Heurestic(hrd[hrname], hr)
+
+            # Construct the scheduler from config
+            scname = next(iter(scd))
+            sc = getattr(schedulers, scname)(*scd[scname])
+            
             for i in range(trials):
                 # TODO: use run_polciy right away
                 pool.append(Process(target = run_policy,
@@ -542,18 +535,29 @@ for env in environments:
                         str(i + 1))
                 index += 1
 
-    heurestics = ecp['ts-heurestics']
-    schedulers = ecp['ts-schedulers']
-    if ecp['ts-tutoring']:
-        for hr in heurestics:
-            for sc in schedulers:
-                for i in range(trials):
-                    pool.append(Process(target = run_tutoring,
-                        args = (env, ecp['skeleton'], hr, sc,
-                        i, ecp['episodes'], ecp['steps'], dirn)))
-                    print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
-                    ids.append(env + ': Tutoring (TS): ' + str(i + 1))
-                    index += 1
+    if not ecp['ts-tutoring']:
+        continue
+
+    hrs = ecp['ts-heurestics']
+    sc = ecp['ts-schedulers']
+    for hrd in hrs:
+        for scd in scs:
+            # Construct the heurestic from config
+            hrname = next(iter(hrd))
+            hr = getattr(heurestics, hrname)
+            hr = heurestics.Heurestic(hrd[hrname], hr)
+
+            # Construct the scheduler from config
+            scname = next(iter(scd))
+            sc = getattr(schedulers, scname)(*scd[scname])
+
+            for i in range(trials):
+                pool.append(Process(target = run_tutoring,
+                    args = (env, ecp['skeleton'], hr, sc,
+                    i, ecp['episodes'], ecp['steps'], dirn)))
+                print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
+                ids.append(env + ': Tutoring (TS): ' + str(i + 1))
+                index += 1
 
 # Launch the processes
 start = time.time()

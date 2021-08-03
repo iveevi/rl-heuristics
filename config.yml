@@ -1,0 +1,23 @@
+- Environments:
+  - CartPole-v1:
+    - skeleton: [[4], 2, [32, elu], [32, elu]]
+    - heurestics:
+      - egreedy: Egreedy
+      - theta_omega: Great
+      - hybrid: Hybrid
+      - badhr: Bad
+    - schedulers:
+      - LinearDecay: [800, 50]
+      - DampedOscillator: [800, 50, 50, 0.1, DO1]
+      - DampedOscillator: [800, 100, 100, 0.1, DO2]
+      - DampedOscillator: [1200, 50, 50, 0.1, DO1_Ext]
+    - ts-tutoring: True
+    - ts-heurestics:
+      - egreedy: Egreedy
+      - theta_omega: Great
+    - ts-schedulers:
+      - LinearDecay: [800, 50]
+      - DampedOscillator: [800, 50, 50, 0.1, DO1]
+    - trials: 10
+    - episodes: 1500
+    - steps: 500
