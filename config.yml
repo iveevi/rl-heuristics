@@ -18,6 +18,8 @@
     - ts-schedulers:
       - LinearDecay: [800, 50]
       - DampedOscillator: [800, 50, 50, 0.1, DO1]
-    - trials: 10
-    - episodes: 1500
+      - DampedOscillator: [800, 100, 100, 0.1, DO2]
+      - DampedOscillator: [1200, 50, 50, 0.1, DO1_Ext]
+    - trials: 1
+    - episodes: 15
     - steps: 500

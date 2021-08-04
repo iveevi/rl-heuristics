@@ -8,11 +8,14 @@ class Scheduler:
         self.function = function
         self.iteration = 0
         self.name = name
+
     def __call__(self):
         self.iteration += 1
         return self.function(self.iteration)
+
     def __copy__(self):
         return type(self)(self.name, self.function)
+
     def reset(self):
         self.iteration = 0
 
@@ -26,6 +29,7 @@ class DelayedScheduler(Scheduler):
 
         # Additional params
         self.lag = lag
+
     def __copy__(self):
         return type(self)(self.name, self.lag, self.function)
 
@@ -42,6 +46,7 @@ class LinearDecay(DelayedScheduler):
         # Additonal params
         self.episodes = episodes
         self.min = min
+
     def __copy__(self):
         return type(self)(self.episodes, self.lag, self.min)
 
@@ -68,6 +73,59 @@ class DampedOscillator(DelayedScheduler):
         self.min = m
         self.period = p
         self.name = name
+
+    def __copy__(self):
+        return type(self)(self.episodes, self.lag, self.period, self.min,
+                self.name)
+
+class WaveDecay(DelayedScheduler):
+    epsilon = 1e-2
+
+    def __init__(self, episodes, lag = 0, p = 50, m = 0.1,
+            name = 'DampedOscillator'):
+        gamma = 0.9 # Bounce factor
+        mp = 1 - m
+        kgamma = lambda e : gamma ** ((e - 1) // p)
+
+        modded = (episodes - 1) % p if (episodes - 1) % p != 0 else episodes % p
+        slk = math.log(self.epsilon/(mp * kgamma(episodes)))/modded   # Decay factor
+
+        ftn = lambda e : mp * math.exp(slk * ((e - 1) % p)) * kgamma(e) + m
+
+        super().__init__(name, lag, ftn)
+
+        # Additonal params
+        self.episodes = episodes
+        self.min = m
+        self.period = p
+        self.name = name
+
+    def __copy__(self):
+        return type(self)(self.episodes, self.lag, self.period, self.min,
+                self.name)
+
+class InverseWaveDecay(DelayedScheduler):
+    epsilon = 1e-2
+
+    def __init__(self, episodes, lag = 0, p = 50, m = 0.1,
+            name = 'DampedOscillator'):
+        gamma = 0.9 # Bounce factor
+        mp = 1 - m
+        kgamma = lambda e : gamma ** ((e - 1) // p)
+
+        modded = (episodes - 1) % p if (episodes - 1) % p != 0 else episodes % p
+        slk = math.log(self.epsilon/(mp * kgamma(episodes)))/modded   # Decay factor
+
+        ftn = lambda e : mp * (1 - math.exp(slk * ((p - e) % p))) * kgamma(e) + m
+
+        super().__init__(name, lag, ftn)
+
+        # Additonal params
+        self.episodes = episodes
+        self.min = m
+        self.period = p
+        self.name = name
+
     def __copy__(self):
         return type(self)(self.episodes, self.lag, self.period, self.min,
                 self.name)

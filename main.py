@@ -37,7 +37,7 @@ for env in pre_envs:
 		ndict[name] = d[name]
 	env = {next(iter(env)): ndict}
 
-	environments |= env
+	environments = {**environments, **env}
 
 # Sampling from replay buffers
 def sample(rbf, size):
@@ -452,7 +452,8 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
     notify.notify(msg)
 
     # Record the results
-    pdir = dirn + '/' + env + '/TS_Tutoring'
+    pdir = dirn + '/' + env + '/TS_' + (heurestic.name + \
+            '_and_' + scheduler.name).replace(' ', '_')
     os.system(f'mkdir -p {pdir}')
     fname = pdir + f'/Trial_{trial + 1}.csv'
     fout = open(fname, 'w')
@@ -523,7 +524,7 @@ for env in environments:
             # Construct the scheduler from config
             scname = next(iter(scd))
             sc = getattr(schedulers, scname)(*scd[scname])
-            
+
             for i in range(trials):
                 # TODO: use run_polciy right away
                 pool.append(Process(target = run_policy,
@@ -539,7 +540,7 @@ for env in environments:
         continue
 
     hrs = ecp['ts-heurestics']
-    sc = ecp['ts-schedulers']
+    scs = ecp['ts-schedulers']
     for hrd in hrs:
         for scd in scs:
             # Construct the heurestic from config
@@ -555,8 +556,10 @@ for env in environments:
                 pool.append(Process(target = run_tutoring,
                     args = (env, ecp['skeleton'], hr, sc,
                     i, ecp['episodes'], ecp['steps'], dirn)))
-                print('Adding \"' + env + ': Tutoring (TS): ' + str(i + 1) + '\" as index #' + str(index))
-                ids.append(env + ': Tutoring (TS): ' + str(i + 1))
+                pid = 'Tutoring (TS): ' + hr.name + ' and ' + \
+                    sc.name + ': ' + str(i + 1)
+                print('Adding \"' + env + ': ' + pid + '\" as index #' + str(index))
+                ids.append(env + ': ' + pid)
                 index += 1
 
 # Launch the processes
