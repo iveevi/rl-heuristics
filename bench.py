@@ -35,21 +35,6 @@ plt.plot(range(1, 1001), scores)
 plt.show()
 '''
 
-def mc_great(state):
-    pos = state[0] + 0.5
-    vel = state[1]
-
-    if pos > 0:
-        if vel > 0:
-            return 2
-        else:
-            return 0
-    else:
-        if vel < 0:
-            return 0
-        else:
-            return 2
-
 runs.run_heuristic_bench('CartPole-v1', Heurestic('Great', theta_omega), 100, 500)
 runs.run_heuristic_bench('CartPole-v1', Heurestic('Random', egreedy_cp), 100, 500)
 runs.run_heuristic_bench('MountainCar-v0', Heurestic('Random', egreedy_mc), 100, 200)

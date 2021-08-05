@@ -33,3 +33,19 @@ def hybrid(state):
         return egreedy(state)
     else:
         return theta_omega(state)
+
+# Best heurestic for MountainCar-v0
+def mc_great(state):
+    pos = state[0] + 0.5
+    vel = state[1]
+
+    if pos > 0:
+        if vel > 0:
+            return 2
+        else:
+            return 0
+    else:
+        if vel < 0:
+            return 0
+        else:
+            return 2
