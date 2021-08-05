@@ -1,5 +1,7 @@
 import gym
+import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 from copy import copy
 from collections import deque
@@ -10,6 +12,7 @@ import notify
 from time_buffer import *
 from score_buffer import *
 from colors import *
+from schedulers import *
 
 # Global variables
 bench_episodes = 50
@@ -190,7 +193,7 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dir
         finals.append(score)
 
     # Log completion
-    msg = f'{id} (index = {index}) finished in {fmt_time(time.time() - start)}'
+    msg = f'{id} finished in {fmt_time(time.time() - start)}'
     print(GREEN + msg + RESET)
     notify.notify(msg)
 
@@ -206,6 +209,131 @@ def run_policy(ename, skeleton, heurestic, schedref, trial, episodes, steps, dir
         'Finals, ' + ','.join([str(f) for f in finals])
     ])
     fout.close()
+
+def run_policy_ret(ename, skeleton, heurestic, schedref, trial, episodes, steps):
+    # Now import tensorflow
+    import tensorflow as tf
+
+    from tensorflow import keras
+
+    # Config GPUs
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+
+    # Initialize the scheduler and id
+    scheduler = copy(schedref)
+    id = ename + ': ' + heurestic.name + ' and ' + scheduler.name + ': ' + \
+        str(trial + 1)
+
+    # First two layers
+    first_layer = keras.layers.Dense(skeleton[2][0], activation = skeleton[2][1], input_shape = skeleton[0])
+    last_layer = keras.layers.Dense(skeleton[1])
+
+    # Populating the layers
+    layers = [first_layer]
+    for sl in skeleton[3:]:
+        layers.append(keras.layers.Dense(sl[0], activation = sl[1]))
+    layers.append(last_layer)
+
+    # Creating the models
+    model = keras.models.Sequential(layers)
+
+    # Other variables
+    env = gym.make(ename)
+    eps = 1
+    rbf = deque(maxlen = 2000)  # Should be customizable
+    batch_size = 32             # Should be customizable
+
+    gamma = 0.95                # Should be customizable
+    loss_ftn = keras.losses.mean_squared_error
+    optimizer = keras.optimizers.Adam(learning_rate = 1e-2)
+    nouts = env.action_space.n  # Should be customizable
+
+    start = time.time()
+
+    scores = []
+    epsilons = []
+
+    # Training loop
+    tb = TimeBuffer(episodes)
+    proj = 0
+
+    for e in range(episodes):
+        # Get the first observation
+        state = env.reset()
+        score = 0
+
+        tb.start()
+        for s in range(steps):
+            # Get the action
+            if np.random.rand() < eps:
+                action = heurestic(state)
+                print(f'Heurestic action: {action}')
+            else:
+                Qvs = model(state[np.newaxis])
+                action = np.argmax(Qvs[0])
+
+            # Apply the action and update the state
+            nstate, reward, done, info = env.step(action)
+            rbf.append((state, action, reward, nstate, done))
+            state = nstate
+            score += reward
+
+            if done:
+                break
+
+        # Post episode routines
+        tb.split()
+        proj, fmt1, fmt2 = cmp_and_fmt(proj, tb.projected())
+
+        # Logging
+        msg = f'{id:<50} Episode {e:<5} Score = {score:<5} Epsilon {eps:.2f}' \
+                f' Time = [{str(tb):<20}], Projected'
+
+        print(msg + f' [{fmt1}]')
+        if e % notify.interval == 1:
+            notify.log(msg + f' [{fmt2}]')
+
+        # Post processing
+        scores.append(score)
+        epsilons.append(eps)
+        eps = scheduler()
+
+        # Train the model if the rbf is full enough
+        if len(rbf) >= batch_size:
+            train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts)
+
+    # Training loop
+    finals = []
+    for e in range(bench_episodes):
+        # Get the first observation
+        state = env.reset()
+        score = 0
+
+        for s in range(steps):
+            # Get the action
+            Qvs = model(state[np.newaxis])
+            action = np.argmax(Qvs[0])
+
+            # Apply the action and update the state
+            nstate, reward, done, info = env.step(action)
+            state = nstate
+            score += reward
+
+            if done:
+                break
+
+        finals.append(score)
+
+    # Log completion
+    msg = f'{id} finished in {fmt_time(time.time() - start)}'
+    print(GREEN + msg + RESET)
+    notify.notify(msg)
+
+    # Record the results
+    return scores
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):
     # Assume only using GPU 0 (for my system)
@@ -424,12 +552,12 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
         finals2.append(score2)
 
     # Log completion
-    msg = f'{id} (index = {index}) finished in {fmt_time(time.time() - start)}'
+    msg = f'{id} finished in {fmt_time(time.time() - start)}'
     print(GREEN + msg + RESET)
     notify.notify(msg)
 
     # Record the results
-    pdir = dirn + '/' + env + '/TS_' + (heurestic.name + \
+    pdir = dirn + '/' + ename + '/TS_' + (heurestic.name + \
             '_and_' + scheduler.name).replace(' ', '_')
     os.system(f'mkdir -p {pdir}')
     fname = pdir + f'/Trial_{trial + 1}.csv'
@@ -444,3 +572,44 @@ def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, d
         'Finals A2, ' + ','.join([str(f) for f in finals2])
     ])
     fout.close()
+
+def run_heuristic_bench(ename, heurestic, episodes, steps, render = False, plot = False):
+    env = gym.make(ename)
+
+    finals = []
+    for e in range(episodes):
+        # Get the first observation
+        state = env.reset()
+        score = 0
+
+        if render:
+            env.render()
+
+        for s in range(steps):
+            # Get the action
+            action = heurestic(state)
+
+            # Apply the action and update the state
+            nstate, reward, done, info = env.step(action)
+            state = nstate
+            score += reward
+
+            if render:
+                    env.render()
+
+            if done:
+                break
+
+        finals.append(score)
+
+        if render:
+            input('Enter for next episode: ')
+
+    print(f'Average score for {heurestic.name} out of {episodes}' \
+            + f' episodes was {np.average(finals)}')
+
+    if plot:
+        plt.plot(range(1, episodes + 1), finals)
+        plt.show()
+
+    return finals

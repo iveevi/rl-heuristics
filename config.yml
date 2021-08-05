@@ -2,7 +2,7 @@
   - CartPole-v1:
     - skeleton: [[4], 2, [32, elu], [32, elu]]
     - heurestics:
-      - egreedy: Egreedy
+      - egreedy_cp: Random
       - theta_omega: Great
       - hybrid: Hybrid
       - badhr: Bad
@@ -13,7 +13,7 @@
       - DampedOscillator: [1200, 50, 50, 0.1, DO1_Ext]
     - ts-tutoring: True
     - ts-heurestics:
-      - egreedy: Egreedy
+      - egreedy_cp: Random
       - theta_omega: Great
     - ts-schedulers:
       - LinearDecay: [800, 50]

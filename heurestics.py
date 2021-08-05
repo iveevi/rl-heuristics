@@ -9,8 +9,11 @@ class Heurestic:
         return self.function(x)
 
 # Epsilon greedy policy
-def egreedy(state):
-    return np.random.randint(1)
+def egreedy_ftn(nouts):
+    return lambda s: np.random.randint(nouts)
+
+egreedy_cp = egreedy_ftn(2)
+egreedy_mc = egreedy_ftn(3)
 
 # Bad heurestic
 def badhr(state):
