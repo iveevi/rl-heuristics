@@ -116,10 +116,10 @@ while len(pool) > 0:
     # No need to check all the time
     time.sleep(1)
 
-# Upload data
-upload(dir)
-
 # Log completion
 msg = f'Completed all simulations in {fmt_time(time.time() - start)}, see `{dirn}`'
 print(msg)
 notify.notify(msg)
+
+# Upload data
+upload(dir)

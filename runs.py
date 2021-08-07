@@ -270,7 +270,6 @@ def run_policy_ret(ename, skeleton, heurestic, schedref, trial, episodes, steps)
             # Get the action
             if np.random.rand() < eps:
                 action = heurestic(state)
-                print(f'Heurestic action: {action}')
             else:
                 Qvs = model(state[np.newaxis])
                 action = np.argmax(Qvs[0])
@@ -305,34 +304,148 @@ def run_policy_ret(ename, skeleton, heurestic, schedref, trial, episodes, steps)
         if len(rbf) >= batch_size:
             train(tf, model, rbf, batch_size, loss_ftn, optimizer, gamma, nouts)
 
-    # Training loop
-    finals = []
-    for e in range(bench_episodes):
-        # Get the first observation
+    # Record the results
+    return scores
+
+# Hard coded for now
+class ActorCritic():
+    # TODO: pass hidden layers only next, or better yet just manually program the network architectures
+    def __init__(self, tf):
+        self.critic = tf.keras.models.Sequential([
+            tf.keras.layers.Dense(32, activation='elu', input_shape=[4]),
+            tf.keras.layers.Dense(32, activation='elu'),
+            tf.keras.layers.Dense(1)
+        ])
+        
+        self.c_opt = tf.keras.optimizers.Adam(learning_rate=7e-3)
+
+        self.actor = tf.keras.models.Sequential([
+            tf.keras.layers.Dense(32, activation='elu', input_shape=[4]),
+            tf.keras.layers.Dense(32, activation='elu'),
+            tf.keras.layers.Dense(2, activation='softmax')
+        ])
+
+        self.a_opt = tf.keras.optimizers.RMSprop(learning_rate=7e-3)
+
+        # TODO: should go as part of the environment (config)
+        self.gamma = 0.97
+    
+    def __call__(self, tf, state):
+        prob = self.actor(np.array([state]))
+        prob = prob.numpy()
+        dist = tf.compat.v1.distributions.Categorical(logits=tf.math.log([prob]), dtype=tf.float32)
+        action = dist.sample()
+        return int(action.numpy()[0])
+    
+    def actor_loss(self, tf, probs, actions, td):
+        probability = []
+        log_probability= []
+        for pb,a in zip(probs,actions):
+          dist = tf.compat.v1.distributions.Categorical(logits=tf.math.log([pb]), dtype=tf.float32)
+          log_prob = dist.log_prob(a)
+          prob = dist.prob(a)
+          probability.append(prob)
+          log_probability.append(log_prob)
+
+        p_loss = []
+        e_loss = []
+        td = td.numpy()
+        for pb, t, lpb in zip(probability, td, log_probability):
+                        t =  tf.constant(t)
+                        policy_loss = tf.math.multiply(lpb,t)
+                        entropy_loss = tf.math.negative(tf.math.multiply(pb,lpb))
+                        p_loss.append(policy_loss)
+                        e_loss.append(entropy_loss)
+        p_loss = tf.stack(p_loss)
+        e_loss = tf.stack(e_loss)
+        p_loss = tf.reduce_mean(p_loss)
+        e_loss = tf.reduce_mean(e_loss)
+        
+        loss = -p_loss - 0.0001 * e_loss
+        
+        return loss
+
+    def learn(self, tf, states, actions, discnt_rewards):
+        discnt_rewards = tf.reshape(discnt_rewards, (len(discnt_rewards),))
+        
+        with tf.GradientTape() as tape1, tf.GradientTape() as tape2:
+            p = self.actor(states, training=True)
+            v =  self.critic(states, training=True)
+            v = tf.reshape(v, (len(v),))
+            td = tf.math.subtract(discnt_rewards, v)
+            
+            a_loss = self.actor_loss(tf, p, actions, td)
+            c_loss = 0.5 * tf.keras.losses.mean_squared_error(discnt_rewards, v)
+
+        grads1 = tape1.gradient(a_loss, self.actor.trainable_variables)
+        grads2 = tape2.gradient(c_loss, self.critic.trainable_variables)
+
+        self.a_opt.apply_gradients(zip(grads1, self.actor.trainable_variables))
+        self.c_opt.apply_gradients(zip(grads2, self.critic.trainable_variables))
+
+        return a_loss, c_loss
+
+def preprocess1(states, actions, rewards, gamma):
+    discnt_rewards = []
+    sum_reward = 0
+    rewards.reverse()
+    for r in rewards:
+      sum_reward = r + gamma*sum_reward
+      discnt_rewards.append(sum_reward)
+    discnt_rewards.reverse()
+    states = np.array(states, dtype=np.float32)
+    actions = np.array(actions, dtype=np.int32)
+    discnt_rewards = np.array(discnt_rewards, dtype=np.float32)
+
+    return states, actions, discnt_rewards
+
+def run_policy_ret_modded(ename, episodes, steps):
+    # Import statements
+    import tensorflow as tf
+
+    from tensorflow import keras
+
+    # Global variables
+    ac = ActorCritic(tf)
+    steps = 250
+    ep_reward = []
+    total_avgr = []
+    env = gym.make(ename)
+    scores = []
+    
+    for e in range(episodes):
+        # Episode local variables
+        done = False
         state = env.reset()
         score = 0
-
+        all_aloss = []
+        all_closs = []
+        rewards = []
+        states = []
+        actions = []
+        
         for s in range(steps):
-            # Get the action
-            Qvs = model(state[np.newaxis])
-            action = np.argmax(Qvs[0])
-
-            # Apply the action and update the state
-            nstate, reward, done, info = env.step(action)
-            state = nstate
+            # value, pdist = ac(state)
+            action = ac(tf, state)
+            next_state, reward, done, _ = env.step(action)
+            rewards.append(reward)
+            states.append(state)
+            actions.append(action)
+            state = next_state
             score += reward
-
+            
             if done:
                 break
+        
+        ep_reward.append(score)
+        avg_reward = np.mean(ep_reward[-100:])
+        total_avgr.append(avg_reward)
+        scores.append(score)
+        states, actions, distincts = preprocess1(states, actions, rewards, 1)
+        al, cl = ac.learn(tf, states, actions, distincts)
+        
+        print("total reward after {} episodes is {} and avg reward is {}".format(e, score, avg_reward))
 
-        finals.append(score)
-
-    # Log completion
-    msg = f'{id} finished in {fmt_time(time.time() - start)}'
-    print(GREEN + msg + RESET)
-    notify.notify(msg)
-
-    # Record the results
     return scores
 
 def run_tutoring(ename, skeleton, heurestic, schedref, trial, episodes, steps, dirn):

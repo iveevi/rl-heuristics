@@ -51,7 +51,7 @@ def get_policy_average(path, pol):
     conf = 0.95
     window = 10
 
-    if pol == 'TS_Tutoring':
+    if pol[:2] == 'TS':
         tscores = get_ts_policy(path + '/' + pol)
     else:
         tscores = get_policy(path + '/' + pol)
@@ -113,7 +113,7 @@ def graph_policy(path):
         index = path.find('/')
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
-        loc = pdfs + path[spi + 1:-4] + '.pdf'
+        loc = pdfs + path[path.rfind('/'):-4] + '.pdf'
         print(f'Saving to {loc}...')
         fig.savefig(loc)
     print()
@@ -168,7 +168,7 @@ def graph_ts_policy(path):
         index = path.find('/')
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
-        loc = pdfs + path[spi + 1:-4] + '.pdf'
+        loc = pdfs + path[path.rfind('/'):-4] + '.pdf'
         print(f'Saving to {loc}...')
         fig.savefig(loc)
     print()
@@ -201,7 +201,7 @@ def graph_policy_average(path, pol):
         index = path.find('/')
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
-        loc = pdfs + path[spi + 1:] + '.pdf'
+        loc = pdfs + path[path.rfind('/'):-4] + '.pdf'
         print(f'Saving to {loc}...')
         fig.savefig(loc)
     print()
@@ -235,7 +235,7 @@ def graph_environment_averages(path, dirs):
         index = path.find('/')
         pdfs = path[:index] + '/pdfs/'
         os.system(f'mkdir -p {pdfs}')
-        loc = pdfs + path[spi + 1:] + '.pdf'
+        loc = pdfs + path[path.rfind('/'):-4] + '.pdf'
         print(f'Saving to {loc}...')
         fig.savefig(loc)
     print()
@@ -290,7 +290,7 @@ def graph_environment(path):
             if index < 1 or index > len(dirs):
                 print('\tIndex is out of bounds\n')
             else:
-                if dirs[index - 1] == 'TS_Tutoring':
+                if dirs[index - 1][:2] == 'TS':
                     graph_ts_policy(path + '/' + dirs[index - 1])
                 else:
                     graph_policy(path + '/' + dirs[index - 1])
