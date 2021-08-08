@@ -5,23 +5,19 @@ import notify
 
 from heurestics import *
 from schedulers import *
+from score_buffer import *
 
 import matplotlib.pyplot as plt
 
 notify.su_off = True
 
-scores = runs.run_policy_ret_modded(
-        'CartPole-v1',
-        100, # Change to 3000 for mountain car
-        500
+episodes = 1000
+scores, confs, tds = runs.run_policy_ret_modded(
+        'MountainCar-v0',
+        Heurestic('Great', mc_great),
+        episodes,
+        200
 )
-
-# rewards.append(reward)
-# values.append(value)
-# log_probs.append(log_prob)
-
-# entropy_term += entropy
-# state = new_state
 
 '''
 scores = runs.run_policy_ret(
@@ -35,7 +31,20 @@ scores = runs.run_policy_ret(
 )
 '''
 
-plt.plot(range(1, 101), scores)
+def smooth(x, w):
+    xp = []
+    sb = ScoreBuffer(w)
+    for xi in x:
+        sb.append(xi)
+        xp.append(sb.average())
+    return xp
+
+# Plot
+fig, (ax1, ax2, ax3) = plt.subplots(3)
+eps = range(1, episodes + 1)
+ax1.plot(eps, smooth(scores, 100))
+ax2.plot(eps, smooth(confs, 5))
+ax3.plot(eps, smooth(tds, 5))
 plt.show()
 
 '''
