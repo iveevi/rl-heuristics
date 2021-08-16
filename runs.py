@@ -87,24 +87,15 @@ class ActorCritic():
 
         # Pseudo rewards
         self.rho = tf.keras.models.Sequential([
-            tf.keras.layers.Dense(64, activation='elu', input_shape=nins),
-            tf.keras.layers.Dense(128, activation='elu'),
-            tf.keras.layers.Dense(64, activation='elu'),
+            tf.keras.layers.Dense(3, activation='elu', input_shape=nins),
+            # tf.keras.layers.Dense(128, activation='elu'),
+            tf.keras.layers.Dense(3, activation='elu'),
             tf.keras.layers.Dense(1, activation=tf.keras.layers.LeakyReLU(alpha=0.01))
         ])
-        self.rho_opt = tf.keras.optimizers.Adam(learning_rate=7e-3)
-
-        # Exploitation confidence
-        self.conf = tf.keras.models.Sequential([
-            tf.keras.layers.Dense(64, activation='elu', input_shape=nins),
-            tf.keras.layers.Dense(128, activation='tanh'),
-            tf.keras.layers.Dense(64, activation='elu'),
-            tf.keras.layers.Dense(1, activation='sigmoid')
-        ])
-        self.conf_opt = tf.keras.optimizers.Adam(learning_rate=7e-3)
+        self.rho_opt = tf.keras.optimizers.Adam(learning_rate=1e-3)
 
         # Maximal trajectory
-        self.max_trajectory = (None, None, None)
+        self.max_trajectory = None
         self.max_reward = -np.Inf
 
     def __call__(self, tf, state):
@@ -115,40 +106,15 @@ class ActorCritic():
         return int(action.numpy()[0])
 
     def reward(self, state):
-        raw = self.rho(state[np.newaxis]).numpy()[0, 0]
-        return raw
-
-    def confidence(self, state):
-        return self.conf(state[np.newaxis]).numpy()[0, 0]
-
-    def learn_rho(self, tf, states, gamma):
-        '''
-        with tf.GradientTape() as tape:
-            rho_rews = self.rho(states, training=True)
-            rews_copy = rho_rews.numpy().tolist()
-
-            nrho_rews = tf.math.log(tf.math.add(rho_rews, tf.ones(rho_rews.shape)))
-            pluses = tf.pow(tf.constant(gamma), tf.range(len(states), 0.0, -1.0))
-            pluses = tf.math.scalar_mul(0.01, pluses) # 5 is some factor
-            pluses = tf.reshape(pluses, nrho_rews.shape)
-            nrho_rews = tf.math.add(nrho_rews, pluses)
-            rho_loss = 0.5 * tf.keras.losses.mean_squared_error(nrho_rews, rho_rews)
-
-        grads = tape.gradient(rho_loss, self.rho.trainable_variables)
-        self.rho_opt.apply_gradients(zip(grads, self.rho.trainable_variables))
-
-        # rerho_rews = self.rho(states, training=True)
-        # print('all rews again = ', tf.concat([rho_rews, nrho_rews, rerho_rews], axis=-1))
-        '''
-
-        #if not self.max_trajectory[0] is None:
-        #    self.learn_maximal_rho(tf)
+        #raw = self.rho(state[np.newaxis]).numpy()[0, 0]
+        #return raw
+        return -math.dist(state, (2.5, 2.5))
 
     def learn_maximal_rho(self, tf):
         # print('learning maximal, with reward = ', self.max_reward)
         with tf.GradientTape() as tape:
-            rhos = self.rho(self.max_trajectory[0], training=True)
-            new_rhos = tf.divide(rhos, tf.fill(rhos.shape, 1.1))
+            rhos = self.rho(self.max_trajectory, training=True)
+            new_rhos = tf.divide(tf.fill(rhos.shape, 1.1), rhos)
             #scales = tf.pow(tf.constant(0.985),
             #        tf.range(len(self.max_trajectory[0]), 0.0, -1.0))
             #new_rhos = tf.multiply(new_rhos, scales)
@@ -157,7 +123,7 @@ class ActorCritic():
         grads = tape.gradient(rho_loss, self.rho.trainable_variables)
         self.rho_opt.apply_gradients(zip(grads, self.rho.trainable_variables))
 
-        again_rhos = self.rho(self.max_trajectory[0])
+        # again_rhos = self.rho(self.max_trajectory)
         # print('old, expected, new = ', tf.concat([rhos, new_rhos, again_rhos], axis=1))
 
     def learn_conf(self, tf, states, calibrate=False):
@@ -263,6 +229,12 @@ def a2c(env, heurestic, episodes, steps, rho, gamma=0.99):
     sched = LinearDecay(800, 50)
     eps = sched()
 
+    # Initial rho rewards
+    x = np.linspace(0.0, env.dim)
+    y = np.linspace(0.0, env.dim)
+
+    inits = [[ac.reward(np.array([xi, yi])) for xi in x] for yi in y]
+
     # Initialize dummy true score
     true = -1
     for e in range(episodes):
@@ -277,20 +249,16 @@ def a2c(env, heurestic, episodes, steps, rho, gamma=0.99):
         actions = []
 
         for s in range(steps):
-            # if np.random.rand() < eps:
-            #    action = heurestic(state)
-            # else:
             action = ac(tf, state)
-
             nstate, true, done, _ = env.step(action)
 
             if rho:
-                reward = ac.reward(state)
+                reward = ac.reward(nstate)
             else:
                 reward = true
 
             rewards.append(reward)
-            states.append(state)
+            states.append(copy(state))
             actions.append(action)
             trues.append(true)
 
@@ -303,16 +271,14 @@ def a2c(env, heurestic, episodes, steps, rho, gamma=0.99):
 
         states, actions, discounted = preprocess(states, actions, rewards, gamma)
         ac.learn(tf, states, actions, discounted)
-        # ac.learn_conf(tf, states, e < 50)
+
         eps = sched()
 
         # Change after the preprocessing
         if tscore > ac.max_reward:
-            ac.max_trajectory = (states, actions, discounted)
+            ac.max_trajectory = states
             ac.max_reward = tscore
 
-        #if true == 0:
-        #    print('SPARSE!!')
         if rho:
             ac.learn_maximal_rho(tf)
             print('Learning optimal trajectory...')
@@ -321,22 +287,13 @@ def a2c(env, heurestic, episodes, steps, rho, gamma=0.99):
         tscores.append(tscore)
         print(f'episode {e + 1}, score {score}, true score {tscore}')
 
-    # Plotting helper function
-    def smooth(x, w):
-        xp = []
-        sb = ScoreBuffer(w)
-        for xi in x:
-            sb.append(xi)
-            xp.append(sb.average())
-        return xp
-
     # Summary
     score = 0
-    for state in ac.max_trajectory[0]:
+    for state in ac.max_trajectory:
         score += ac.reward(state)
     print('Summary: score for max trajectory is', score)
 
     if rho:
-        return tscores, scores
+        return tscores, scores, ac, inits
     else:
         return scores

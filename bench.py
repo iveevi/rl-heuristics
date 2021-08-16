@@ -1,7 +1,9 @@
 import sys
 import gym
+import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from collections import namedtuple
 
@@ -11,9 +13,11 @@ from heurestics import *
 from schedulers import *
 from score_buffer import *
 
+# Put in another file
 class BoxEnv:
     act_space = namedtuple('action_space', 'n')
     obs_space = namedtuple('observation_space', 'shape')
+    radius = 1.0
 
     def __init__(self, dim, tgt=np.random.rand(2)):
         self.pos = None
@@ -58,32 +62,86 @@ class BoxEnv:
         return self.pos, (0 if self.__goal() else -1), \
             self.__goal(), None
 
-env = BoxEnv(5, (3, 4))
+tgt = (2.5, 2.5)
+env = BoxEnv(5, tgt)
+episodes = 100
+steps = 200
 
-episodes = 1000
-score1, rho1 = runs.a2c(
+score1, rho1, ac, inits = runs.a2c(
         env,
         Heurestic('Great', mc_great),
         episodes,
-        200,
+        steps,
         True
 )
 
+'''
 score = runs.a2c(
         env,
         Heurestic('Great', mc_great),
         episodes,
-        500,
+        steps,
         False
 )
+'''
+
+# Plotting helper function
+def smooth(x, w):
+    xp = []
+    sb = ScoreBuffer(w)
+    for xi in x:
+        sb.append(xi)
+        xp.append(sb.average())
+    return xp
 
 # Plotting
 eps = range(1, episodes + 1)
+x = np.linspace(0.0, env.dim)
+y = np.linspace(0.0, env.dim)
 
-plt.plot(eps, score1, label='Rho True')
-plt.plot(eps, rho1, label='Rho Reward')
+fins = [[ac.reward(np.array([xi, yi])) for xi in x] for yi in y]
+fqvs = [[ac.critic(np.array([xi, yi])[None])[0, 0] for xi in x] for yi in y]
 
-plt.plot(eps, score, label='Regular')
+fig, (main, ax1, ax2, ax3) = plt.subplots(4)
 
-plt.legend()
+main.plot(eps, smooth(score1, 10), label='Rho True')
+main.plot(eps, smooth(rho1, 10), label='Rho Reward')
+# main.plot(eps, smooth(score, 10), label='Regular')
+
+# Plot the maximal (mu) trajectory
+(mu_xs, mu_ys, xs, ys) = ([], [], [], [])
+for state in ac.max_trajectory:
+    mu_xs.append(state[0])
+    mu_ys.append(state[1])
+
+state = env.reset()
+for _ in range(steps):
+    act = ac(tf, state)
+    nstate, true, done, _ = env.step(act)
+    xs.append(state[0])
+    ys.append(state[1])
+    state = nstate
+
+    if done:
+        break
+
+pt = (tgt[0] - 1, tgt[1] - 1)
+rad = 2 * BoxEnv.radius
+
+ax2.plot(xs, ys, color='grey')
+ax2.plot(mu_xs, mu_ys, color='white')
+ax2.add_patch(patches.Rectangle(pt, rad, rad, alpha=0.5, color='grey'))
+
+cf1 = ax1.contourf(x, y, inits, 100)
+cf2 = ax2.contourf(x, y, fins, 100)
+cf3 = ax3.contourf(x, y, fqvs, 100)
+
+fig.colorbar(cf1, ax=ax1)
+fig.colorbar(cf2, ax=ax2)
+fig.colorbar(cf3, ax=ax3)
+
+fig.tight_layout()
+fig.set_size_inches(8, 10)
+
+main.legend()
 plt.show()
