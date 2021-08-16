@@ -106,25 +106,26 @@ class ActorCritic():
         return int(action.numpy()[0])
 
     def reward(self, state):
-        #raw = self.rho(state[np.newaxis]).numpy()[0, 0]
-        #return raw
-        return -math.dist(state, (2.5, 2.5))
+        raw = self.rho(state[np.newaxis]).numpy()[0, 0]
+        return raw
+        # return -math.dist(state, (2.5, 2.5))
 
     def learn_maximal_rho(self, tf):
         # print('learning maximal, with reward = ', self.max_reward)
         with tf.GradientTape() as tape:
             rhos = self.rho(self.max_trajectory, training=True)
-            new_rhos = tf.divide(tf.fill(rhos.shape, 1.1), rhos)
+            # new_rhos = tf.divide(tf.fill(rhos.shape, 100.0), rhos)
             #scales = tf.pow(tf.constant(0.985),
             #        tf.range(len(self.max_trajectory[0]), 0.0, -1.0))
             #new_rhos = tf.multiply(new_rhos, scales)
-            rho_loss = 0.5 * tf.keras.losses.mean_squared_error(rhos, new_rhos)
+            # rho_loss = 0.5 * tf.keras.losses.mean_squared_error(rhos, new_rhos)
 
-        grads = tape.gradient(rho_loss, self.rho.trainable_variables)
+        grads = tape.gradient(rhos, self.rho.trainable_variables)
+        grads = [tf.negative(grad) for grad in grads]
         self.rho_opt.apply_gradients(zip(grads, self.rho.trainable_variables))
 
         # again_rhos = self.rho(self.max_trajectory)
-        # print('old, expected, new = ', tf.concat([rhos, new_rhos, again_rhos], axis=1))
+        # print('old, new = ', tf.concat([rhos, again_rhos], axis=1))
 
     def learn_conf(self, tf, states, calibrate=False):
         with tf.GradientTape() as tape:
